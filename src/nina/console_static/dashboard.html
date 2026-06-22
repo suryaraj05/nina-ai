@@ -254,13 +254,14 @@
 
       <!-- Step 1: install + run CLI -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px;">
-        <p style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text);">Step 1 — Run this in your project folder</p>
+        <p style="font-size:.82rem;font-weight:700;margin-bottom:6px;color:var(--text);">Step 1 — Your developer runs this once in the project folder</p>
+        <p style="font-size:.76rem;color:var(--muted);margin-bottom:10px;">Requires Python 3.10+. Scans source code locally — only the route structure is uploaded, never your code.</p>
         <div class="code-block" style="margin:0;">
-          <pre>pip install nina-sdk
+          <pre>pip install git+https://github.com/suryaraj05/nina-ai.git
 nina-scan . --output nina-manifest.json</pre>
-          <button class="copy-btn" onclick="copyText('pip install nina-sdk\nnina-scan . --output nina-manifest.json', this)">Copy</button>
+          <button class="copy-btn" onclick="copyText('pip install git+https://github.com/suryaraj05/nina-ai.git\nnina-scan . --output nina-manifest.json', this)">Copy</button>
         </div>
-        <p style="font-size:.76rem;color:var(--muted);margin-top:10px;">Supports FastAPI · Django · Flask · Express · Laravel · Rails. Scans your source code locally — nothing is uploaded except the route structure.</p>
+        <p style="font-size:.76rem;color:var(--muted);margin-top:10px;">Supports FastAPI · Django · Flask · Express · Laravel · Rails</p>
       </div>
 
       <!-- Step 2: upload file -->
