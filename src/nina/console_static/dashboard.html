@@ -335,7 +335,7 @@ function setLoading(btnId, on, defaultHtml) {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
-async function doLogin() {
+window.doLogin = async function doLogin() {
   const raw = document.getElementById('tokenInput').value.trim();
   if (!raw) { setStatus('loginStatus','Enter your dashboard token.','err'); return; }
   setLoading('loginBtn', true, 'Sign in');
