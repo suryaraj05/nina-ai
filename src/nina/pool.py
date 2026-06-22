@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 from . import Nina
 
@@ -104,6 +107,11 @@ class NinaPool:
             nina = Nina()
             result = await nina.init({"llm": llm_config, "session": {"store": session_store}})
             if not result.get("ok"):
+                err = result.get("error", {})
+                _log.error(
+                    "NinaPool init failed site=%s code=%s msg=%s",
+                    site_id, err.get("code"), err.get("message"),
+                )
                 return None
             self._instances[site_id] = nina
             self._last_used[site_id] = time.time()

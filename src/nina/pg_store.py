@@ -115,7 +115,6 @@ def _key_row(row: dict[str, Any]) -> dict[str, Any]:
         "environment": row["environment"],
         "kind":        row["kind"],
         "prefix":      row["prefix"],
-        "digest":      row["digest"],
         "revoked":     bool(row["revoked"]),
         "createdAt":   row["created_at"],
     }
