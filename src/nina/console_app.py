@@ -25,7 +25,7 @@ import httpx
 import yaml
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -1489,12 +1489,18 @@ def create_app() -> FastAPI:
 
         return {"ok": True, "data": {"processed": False, "event": event}}
 
+    # ── Named HTML pages (must be before the catch-all static mount) ─────────
+    console_static = Path(__file__).resolve().parent / "console_static"
+
+    @app.get("/dashboard", include_in_schema=False)
+    def serve_dashboard() -> FileResponse:
+        return FileResponse(console_static / "dashboard.html")
+
     # ── Static assets — SDK first, then console UI (catch-all must be last) ──
     sdk_dir = Path(__file__).resolve().parent / "sdk"
     if sdk_dir.exists():
         app.mount("/sdk", StaticFiles(directory=sdk_dir), name="nina-sdk")
 
-    console_static = Path(__file__).resolve().parent / "console_static"
     if console_static.exists():
         app.mount("/", StaticFiles(directory=console_static, html=True), name="console-ui")
 
