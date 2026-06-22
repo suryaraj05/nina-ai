@@ -97,21 +97,10 @@ class Nina:
         )
         self._core.session_store_kind = "custom" if is_custom else "memory"
 
-        if llm_cfg.get("provider") != "custom":
-            try:
-                await self._core.llm.ping()
-            except Exception as exc:
-                from .errors import LLMError
-
-                if isinstance(exc, LLMError):
-                    # Rate limiting means the key is valid but the quota is temporarily
-                    # exhausted. Don't block init — the first real query will handle it.
-                    if exc.code == "NINA_LLM_RATE_LIMITED":
-                        pass
-                    else:
-                        return fail(exc.code, exc.message, exc.details)
-                else:
-                    return fail("NINA_LLM_UNREACHABLE", str(exc))
+        # Ping removed: it wastes one quota slot on every cold start which causes
+        # the immediately-following real query to be rate-limited, especially on
+        # free-tier providers (Gemini 15 RPM). Key validity surfaces on the first
+        # real query instead — a cleaner and cheaper failure mode.
 
         self._core.instance_id = str(uuid.uuid4())
         self._core.initialized = True
