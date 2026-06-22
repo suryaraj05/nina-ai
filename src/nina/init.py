@@ -121,12 +121,20 @@ class _HttpProvider:
         if resp.status_code == 429:
             ra = resp.headers.get("retry-after")
             retry_ms = int(float(ra) * 1000) if ra else None
+            try:
+                body_text = resp.text[:500]
+            except Exception:
+                body_text = ""
             raise LLMError("NINA_LLM_RATE_LIMITED",
-                           f"Rate limited. Retry after {retry_ms} ms.",
+                           f"Rate limited. Retry after {retry_ms} ms. Body: {body_text}",
                            {"retryAfterMs": retry_ms})
         if resp.status_code >= 400:
+            try:
+                body_text = resp.text[:500]
+            except Exception:
+                body_text = ""
             raise LLMError("NINA_LLM_UNREACHABLE",
-                           f"Could not reach LLM provider: HTTP {resp.status_code}.")
+                           f"LLM provider HTTP {resp.status_code}: {body_text}")
         return resp.json()
 
 
