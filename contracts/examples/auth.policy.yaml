@@ -1,0 +1,9 @@
+loginUrl: /login
+postLoginRedirect: /
+sessionIndicator:
+  type: cookie
+  name: session_id
+gatedActions:
+  - checkout
+  - view_account
+  - update_profile

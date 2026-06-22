@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: nina-console
+    runtime: docker
+    plan: starter          # $7/mo — no sleep, always on
+    healthCheckPath: /health
+    envVars:
+      - key: NINA_CONSOLE_STORE_PATH
+        value: /data/nina_console_store.json
+      - key: NINA_CONSOLE_KEY_HASH_SECRET
+        generateValue: true   # Render auto-generates a secret
+      - key: NINA_ENCRYPT_KEY
+        generateValue: true
+      - key: NINA_DEFAULT_LLM_CONFIG
+        sync: false   # Set manually in Render dashboard — contains your LLM API key
+      - key: NINA_REDIS_URL
+        fromService:
+          name: nina-redis
+          type: redis
+          property: connectionString
+    disk:
+      name: nina-data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: redis
+    name: nina-redis
+    plan: starter          # $10/mo
+    maxmemoryPolicy: allkeys-lru

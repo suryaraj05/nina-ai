@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dhaaga &amp; Thread — Indian clothing store</title>
+  <link rel="stylesheet" href="/sdk/nina-panel.css">
+  <style>
+    :root {
+      --bg: #faf8f5; --text: #1a1a1a; --muted: #666; --accent: #1a73e8;
+      --border: #e4e0d8; --card: #fff;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font: 15px/1.5 Georgia, "Times New Roman", serif;
+      background: var(--bg); color: var(--text);
+    }
+    .site-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      background: var(--card); position: sticky; top: 0; z-index: 10;
+    }
+    .site-header h1 { font-size: 20px; font-weight: 700; }
+    .site-header p { font-size: 12px; color: var(--muted); }
+    .cart-btn {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 8px 16px; cursor: pointer;
+      font: inherit;
+    }
+    .cart-btn #nina-cart-count {
+      display: inline-block; min-width: 1.2em; font-weight: 700;
+      color: var(--accent);
+    }
+    .hero {
+      padding: 48px 24px 32px; max-width: 900px; margin: 0 auto;
+    }
+    .hero h2 { font-size: 28px; margin-bottom: 8px; }
+    .hero p { color: var(--muted); max-width: 52ch; }
+    .hero .hint {
+      margin-top: 16px; font-size: 13px; color: var(--accent);
+    }
+    #nina-catalog {
+      padding: 0 24px 48px; max-width: 1100px; margin: 0 auto;
+    }
+    #nina-catalog h2 {
+      font-size: 18px; margin-bottom: 16px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    #nina-product-grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    .product-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px;
+      transition: box-shadow 0.2s;
+    }
+    .product-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .product-card__name { font-weight: 700; margin-bottom: 4px; }
+    .product-card__meta { font-size: 12px; color: var(--muted); text-transform: capitalize; }
+    .product-card__price { color: var(--accent); font-weight: 700; margin: 8px 0; }
+    .product-card__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag { font-size: 11px; border: 1px solid var(--border); border-radius: 99px; padding: 2px 8px; color: var(--muted); }
+    .oos { color: #c5221f; font-size: 12px; margin-top: 6px; }
+    .nina-empty { color: var(--muted); font-style: italic; padding: 24px 0; }
+    #nina-product-detail {
+      position: fixed; right: 24px; bottom: 24px; width: min(360px, 90vw);
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      z-index: 100;
+    }
+    #nina-product-detail[hidden] { display: none; }
+    .detail-close {
+      float: right; border: 0; background: transparent; font-size: 22px; cursor: pointer;
+    }
+    .detail-price { font-weight: 700; color: var(--accent); margin-top: 8px; }
+    #nina-cart-drawer {
+      position: fixed; top: 0; right: 0; width: min(360px, 90vw); height: 100vh;
+      background: var(--card); border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform 0.25s ease;
+      z-index: 200; padding: 20px; overflow-y: auto;
+    }
+    #nina-cart-drawer.open { transform: translateX(0); }
+    #nina-cart-drawer h3 { margin-bottom: 12px; }
+    .cart-row {
+      display: flex; justify-content: space-between; padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    #nina-cart-total {
+      display: block; margin-top: 12px; font-weight: 700; font-size: 18px;
+    }
+    #nina-toasts { pointer-events: none; }
+  </style>
+</head>
+<body data-nina-side="right">
+  <!-- The website — NINA does not replace this; it operates on it -->
+  <header class="site-header">
+    <div>
+      <h1>Dhaaga &amp; Thread</h1>
+      <p>Indian &amp; western wear · prices in INR</p>
+    </div>
+    <button type="button" class="cart-btn" onclick="document.getElementById('nina-cart-drawer').classList.add('open')">
+      Cart (<span id="nina-cart-count">0</span>)
+    </button>
+  </header>
+
+  <section class="hero">
+    <h2>Shop with your voice or keyboard</h2>
+    <p>
+      This is a real storefront page. Open <strong>Ask NINA</strong> on the right —
+      like Google’s Ask Gemini split view. NINA chats with you, then executes:
+      search, cart, checkout on <em>this page</em>.
+    </p>
+    <p class="hint">Try: “what should I wear for summer?” then “add the second one to cart”</p>
+  </section>
+
+  <section id="nina-catalog">
+    <h2>Catalogue</h2>
+    <div id="nina-product-grid">
+      <p class="nina-empty">Products appear here when you ask NINA to search.</p>
+    </div>
+  </section>
+
+  <aside id="nina-product-detail" hidden></aside>
+
+  <aside id="nina-cart-drawer">
+    <h3>Your cart</h3>
+    <div id="nina-cart-items"><p class="nina-empty">Empty</p></div>
+    <span id="nina-cart-total">₹0</span>
+  </aside>
+
+  <div id="nina-toasts"></div>
+
+  <!-- NINA embed: one script tag on any site -->
+  <script src="/sdk/nina-bootstrap.js"
+          data-site-id="dhaaga-thread"
+          data-api="/v1/query"
+          data-manifest="/agent.json"
+          data-report-url="/v1/report-broken-selector"
+          defer></script>
+</body>
+</html>

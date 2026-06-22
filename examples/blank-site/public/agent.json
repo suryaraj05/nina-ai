@@ -1,0 +1,497 @@
+{
+  "site": {
+    "id": "shop",
+    "name": "Shop",
+    "baseUrl": "http://localhost:3010",
+    "locales": [
+      "en-IN"
+    ]
+  },
+  "version": "1.0.0",
+  "description": "Generated contract for Shop",
+  "pages": [
+    {
+      "id": "cart",
+      "urlPattern": "/cart*",
+      "label": "Cart",
+      "actions": [
+        "checkout",
+        "navigate"
+      ]
+    },
+    {
+      "id": "checkout",
+      "urlPattern": "/checkout*",
+      "label": "Checkout",
+      "actions": [
+        "checkout",
+        "navigate"
+      ]
+    },
+    {
+      "id": "home",
+      "urlPattern": "/",
+      "label": "Home",
+      "actions": [
+        "navigate"
+      ]
+    },
+    {
+      "id": "login",
+      "urlPattern": "/login*",
+      "label": "Login",
+      "actions": [
+        "navigate"
+      ]
+    },
+    {
+      "id": "product_detail",
+      "urlPattern": "/product/*",
+      "label": "Product Detail",
+      "actions": [
+        "add_to_cart",
+        "navigate"
+      ]
+    },
+    {
+      "id": "product_list",
+      "urlPattern": "/shop/*",
+      "label": "Product List",
+      "actions": [
+        "open_product"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "navigate",
+      "description": "Go to a page on this site by path or section name",
+      "parameters": {
+        "url": {
+          "type": "string",
+          "required": true,
+          "description": "Target path e.g. /shop"
+        }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "checkout",
+        "product_detail",
+        "home",
+        "cart",
+        "product_list",
+        "login"
+      ],
+      "execute": {
+        "type": "dom",
+        "steps": [
+          {
+            "op": "navigate",
+            "url": "{url}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "open_product",
+      "description": "Open a product detail page",
+      "parameters": {
+        "productUrl": {
+          "type": "string",
+          "required": true,
+          "description": "Product page path or URL e.g. /product/creator-pro"
+        }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "product_list",
+        "home",
+        "product_detail"
+      ],
+      "execute": {
+        "type": "dom",
+        "steps": [
+          {
+            "op": "navigate",
+            "url": "{productUrl}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "add_to_cart",
+      "description": "Add a product variant to the shopping cart",
+      "parameters": {
+        "variantId": {
+          "type": "string",
+          "required": true,
+          "description": "Product variant ID from search or product detail"
+        },
+        "quantity": {
+          "type": "integer",
+          "required": false,
+          "description": "Number of items to add (default 1)"
+        }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "home",
+        "product_list",
+        "cart"
+      ],
+      "execute": {
+        "type": "api",
+        "runtime": "server",
+        "apiRef": {
+          "apiId": "default",
+          "method": "POST",
+          "path": "/api/v1/cart/items",
+          "bodyTemplate": {
+            "variantId": "{variantId}",
+            "quantity": "{quantity}"
+          }
+        },
+        "steps": []
+      }
+    },
+    {
+      "id": "checkout",
+      "description": "Place an order and complete checkout",
+      "parameters": {},
+      "risk": "high",
+      "requiresAuth": true,
+      "availableOn": [
+        "cart",
+        "checkout"
+      ],
+      "execute": {
+        "type": "api",
+        "runtime": "server",
+        "apiRef": {
+          "apiId": "default",
+          "method": "POST",
+          "path": "/api/v1/orders"
+        },
+        "steps": []
+      }
+    },
+    {
+      "id": "show_message",
+      "description": "Answer an informational question without changing the page",
+      "parameters": {
+        "message": {
+          "type": "string",
+          "required": true,
+          "description": "Informational reply to show the user"
+        }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "checkout",
+        "product_detail",
+        "home",
+        "cart",
+        "product_list",
+        "login"
+      ],
+      "execute": {
+        "type": "message",
+        "steps": [
+          {
+            "op": "show_message",
+            "message": "{message}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "search_products",
+      "description": "Search the product catalog by keyword (e.g. laptop, gaming, headphones)",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "required": true,
+          "description": "Search terms"
+        }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "home",
+        "product_list"
+      ],
+      "execute": {
+        "type": "api",
+        "runtime": "server",
+        "apiRef": {
+          "apiId": "default",
+          "method": "GET",
+          "path": "/api/v1/search",
+          "bodyTemplate": {
+            "q": "{query}",
+            "limit": 10
+          }
+        },
+        "steps": []
+      }
+    },
+    {
+      "id": "list_categories",
+      "description": "List product categories for browsing",
+      "parameters": {},
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": [
+        "home",
+        "product_list"
+      ],
+      "execute": {
+        "type": "api",
+        "runtime": "server",
+        "apiRef": {
+          "apiId": "default",
+          "method": "GET",
+          "path": "/api/v1/categories"
+        },
+        "steps": []
+      }
+    }
+  ],
+  "selectors": {},
+  "embed": {
+    "panel": "right",
+    "apiBase": "/v1/query"
+  },
+  "auth": {
+    "loginUrl": "/login",
+    "sessionIndicator": {
+      "type": "cookie",
+      "name": "session_id"
+    },
+    "gatedActions": [
+      "checkout",
+      "view_account"
+    ]
+  },
+  "risk": {
+    "confirmActions": [
+      "checkout",
+      "place_order"
+    ],
+    "blockActions": [
+      "export_all_data"
+    ]
+  },
+  "routes": [
+    {
+      "pattern": "/",
+      "pageId": "home"
+    },
+    {
+      "pattern": "/cart",
+      "pageId": "cart"
+    },
+    {
+      "pattern": "/checkout",
+      "pageId": "checkout"
+    },
+    {
+      "pattern": "/login",
+      "pageId": "login"
+    },
+    {
+      "pattern": "/category/clothing",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/electronics",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/home-garden",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/kitchen",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/laptops",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/mens-wear",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/outdoor",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/smartphones",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/category/womens-wear",
+      "pageId": "product_list"
+    },
+    {
+      "pattern": "/product/binoculars-10x42",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/fire-pit-portable",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/hammock-with-stand",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/cooler-box-32qt",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/trekking-poles-pair",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/water-filter-bottle",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/folding-camp-chair",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/led-lantern-rechargeable",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/hiking-backpack-50l",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/portable-grill",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/insulated-sleeping-bag",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/camping-tent-4-person",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/espresso-machine",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/silicone-utensil-bundle",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/air-fryer-compact",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/knife-block-set",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/cast-iron-dutch-oven",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/pour-over-coffee-kit",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/stand-mixer-classic",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/glass-food-storage-set",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/bamboo-cutting-board",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/electric-kettle-pro",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/ceramic-non-stick-pan",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/stainless-steel-cookware-set",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/crossbody-bag",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/yoga-leggings-set",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/belted-trench-coat",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/satin-evening-top",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/wide-leg-trousers",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/knit-turtleneck",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/wrap-jumpsuit",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/cropped-denim-jacket",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/pleated-a-line-skirt",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/silk-blouse",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/cashmere-blend-cardigan",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/high-rise-skinny-jeans",
+      "pageId": "product_detail"
+    },
+    {
+      "pattern": "/product/floral-midi-dress",
+      "pageId": "product_detail"
+    }
+  ],
+  "apis": {
+    "default": {
+      "baseUrl": "http://localhost:3011",
+      "description": "Store API"
+    }
+  }
+}

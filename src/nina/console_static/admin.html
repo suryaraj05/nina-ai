@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NINA Console</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b1020;
+      --surface: #111832;
+      --muted: #9aa4c0;
+      --text: #eef2ff;
+      --accent: #5b8cff;
+      --ok: #3bb273;
+      --warn: #ffb020;
+      --err: #ff6b6b;
+      --border: #243056;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: #0b1020f2;
+      backdrop-filter: blur(4px);
+      z-index: 2;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: .2px;
+    }
+    .sub {
+      color: var(--muted);
+      margin-top: .25rem;
+      font-size: .9rem;
+    }
+    main {
+      padding: 1rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      padding: 1rem;
+    }
+    .card h2 {
+      margin: 0 0 .75rem;
+      font-size: 1rem;
+    }
+    label {
+      display: block;
+      font-size: .85rem;
+      margin-bottom: .3rem;
+      color: var(--muted);
+    }
+    input, select, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: .6rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0c1430;
+      color: var(--text);
+      padding: .58rem .65rem;
+      font-size: .9rem;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      cursor: pointer;
+      border-color: #3f62c9;
+      background: linear-gradient(180deg, #5b8cff, #456ddd);
+      color: #fff;
+      font-weight: 600;
+    }
+    button.secondary {
+      border-color: var(--border);
+      background: #1a2347;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .5rem;
+    }
+    pre {
+      margin: .4rem 0 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0a1128;
+      padding: .65rem;
+      max-height: 220px;
+      overflow: auto;
+      font-size: .78rem;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: .15rem .55rem;
+      font-size: .75rem;
+      border: 1px solid var(--border);
+      margin-left: .45rem;
+    }
+    .ok { color: var(--ok); border-color: #24553d; }
+    .warn { color: var(--warn); border-color: #6a4b11; }
+    .err { color: var(--err); border-color: #6f2f2f; }
+    .hint { color: var(--muted); font-size: .82rem; margin: .2rem 0 .7rem; }
+    .hint label { display: inline-block; margin-right: .8rem; color: var(--text); }
+    .hint input[type="checkbox"] { width: auto; margin-right: .3rem; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NINA Console <span id="healthPill" class="pill warn">checking health…</span></h1>
+    <div class="sub">Onboard merchants, issue API keys, validate contracts, and run GEO/SEO checks.</div>
+  </header>
+  <main>
+    <section class="card">
+      <h2>1) Organization</h2>
+      <label>Organization name</label>
+      <input id="orgName" value="Acme Commerce">
+      <label>Owner email</label>
+      <input id="orgEmail" value="owner@acme.test">
+      <button id="createOrgBtn">Create organization</button>
+      <pre id="orgOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>2) Site registrar</h2>
+      <label>Org ID</label>
+      <input id="siteOrgId" placeholder="org_xxx">
+      <label>Site name</label>
+      <input id="siteName" value="Acme Store">
+      <label>Base URL</label>
+      <input id="siteBaseUrl" value="https://shop.acme.test">
+      <div class="row">
+        <div>
+          <label>Locales (comma separated)</label>
+          <input id="siteLocales" value="en-IN,hi-IN">
+        </div>
+        <div>
+          <label>Markets (comma separated)</label>
+          <input id="siteMarkets" value="IN">
+        </div>
+      </div>
+      <label>Allowed origins (comma separated)</label>
+      <input id="siteOrigins" value="https://shop.acme.test,https://staging.acme.test">
+      <button id="createSiteBtn">Create site</button>
+      <pre id="siteOut"></pre>
+    </section>
+
+    <section class="card" style="grid-column: 1 / -1;">
+      <h2>Download onboarding pack (zip)</h2>
+      <div class="hint">Generates <code>nina.site.yaml</code>, <code>api.manifest.yaml</code>, <code>sitemap.xml</code>, and policy files — no manual YAML editing.</div>
+      <div class="row">
+        <div>
+          <label>Site ID (optional — uses registered site)</label>
+          <input id="packSiteId" placeholder="site_id from step 2">
+        </div>
+        <div>
+          <label>Site name (if no site ID)</label>
+          <input id="packSiteName" value="Acme Store">
+        </div>
+      </div>
+      <label>Base URL</label>
+      <input id="packBaseUrl" value="https://shop.acme.test">
+      <div class="row">
+        <div>
+          <label>API base URL (optional)</label>
+          <input id="packApiBase" placeholder="defaults to base URL">
+        </div>
+        <div>
+          <label>Sitemap URL (optional — tries /sitemap.xml)</label>
+          <input id="packSitemapUrl" placeholder="https://shop.acme.test/sitemap.xml">
+        </div>
+      </div>
+      <label>Locales (comma separated)</label>
+      <input id="packLocales" value="en-IN">
+      <label>Capabilities</label>
+      <div class="hint">
+        <label><input type="checkbox" id="capSearch" checked> Search</label>
+        <label><input type="checkbox" id="capCategories" checked> Categories</label>
+        <label><input type="checkbox" id="capCart" checked> Cart</label>
+        <label><input type="checkbox" id="capCheckout" checked> Checkout</label>
+      </div>
+      <button id="downloadPackBtn">Download onboarding pack (.zip)</button>
+      <pre id="packOut">Ready — fill fields above and download.</pre>
+    </section>
+
+    <section class="card">
+      <h2>3) API keys</h2>
+      <label>Site ID</label>
+      <input id="keySiteId" placeholder="site_id">
+      <div class="row">
+        <div>
+          <label>Environment</label>
+          <select id="keyEnv">
+            <option value="test">test</option>
+            <option value="live">live</option>
+          </select>
+        </div>
+        <div>
+          <label>Key type</label>
+          <select id="keyKind">
+            <option value="pk">pk (publishable)</option>
+            <option value="sk">sk (secret)</option>
+          </select>
+        </div>
+      </div>
+      <button id="issueKeyBtn">Issue key</button>
+      <pre id="keyOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>4) Onboarding wizard</h2>
+      <div class="hint">Business onboarding in one request: creates org + sandbox site + test publishable key.</div>
+      <label>Org name</label>
+      <input id="wizOrg" value="Wizard Org">
+      <label>Site name</label>
+      <input id="wizSite" value="Wizard Store">
+      <label>Base URL</label>
+      <input id="wizBaseUrl" value="https://wizard-store.test">
+      <button id="wizardInitBtn">Run wizard init</button>
+      <button id="wizardStepsBtn" class="secondary">Show 10 wizard steps</button>
+      <pre id="wizardOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>5) SEO toolkit</h2>
+      <label>Site ID</label>
+      <input id="seoSiteId" placeholder="site_id">
+      <label>Sitemap XML</label>
+      <textarea id="seoXml"><urlset><url><loc>https://shop.acme.test/</loc></url></urlset></textarea>
+      <button id="seoSitemapBtn">Parse sitemap</button>
+      <label>Site URL for embed health</label>
+      <input id="seoSiteUrl" value="https://shop.acme.test">
+      <button id="seoHealthBtn" class="secondary">Check embed health</button>
+      <pre id="seoOut"></pre>
+    </section>
+
+    <section class="card">
+      <h2>6) Generated embed snippet</h2>
+      <div class="hint">Uses last created site + key values from this page.</div>
+      <button id="buildSnippetBtn">Build snippet</button>
+      <pre id="snippetOut"></pre>
+    </section>
+  </main>
+
+  <script>
+    const state = { org: null, site: null, key: null };
+
+    function show(el, data) {
+      document.getElementById(el).textContent =
+        typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    }
+
+    function parseCSV(value) {
+      return (value || "").split(",").map(x => x.trim()).filter(Boolean);
+    }
+
+    async function api(path, body, method = "POST") {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({ ok: false, error: { message: "Invalid JSON response" } }));
+      return { status: res.status, data };
+    }
+
+    async function checkHealth() {
+      const pill = document.getElementById("healthPill");
+      try {
+        const res = await fetch("/health");
+        const ok = res.ok;
+        pill.textContent = ok ? "healthy" : "unhealthy";
+        pill.className = "pill " + (ok ? "ok" : "err");
+      } catch (err) {
+        pill.textContent = "offline";
+        pill.className = "pill err";
+        console.error("[NINA Console] health check failed:", err);
+      }
+    }
+
+    document.getElementById("createOrgBtn").onclick = async () => {
+      const body = {
+        name: document.getElementById("orgName").value,
+        ownerEmail: document.getElementById("orgEmail").value || null,
+      };
+      const out = await api("/v1/orgs", body);
+      state.org = out.data.data || null;
+      if (state.org) {
+        document.getElementById("siteOrgId").value = state.org.id;
+      }
+      show("orgOut", out);
+    };
+
+    document.getElementById("createSiteBtn").onclick = async () => {
+      const body = {
+        orgId: document.getElementById("siteOrgId").value,
+        name: document.getElementById("siteName").value,
+        baseUrl: document.getElementById("siteBaseUrl").value,
+        locales: parseCSV(document.getElementById("siteLocales").value),
+        markets: parseCSV(document.getElementById("siteMarkets").value),
+        allowedOrigins: parseCSV(document.getElementById("siteOrigins").value),
+      };
+      const out = await api("/v1/sites", body);
+      state.site = out.data.data || null;
+      if (state.site) {
+        document.getElementById("keySiteId").value = state.site.id;
+        document.getElementById("seoSiteId").value = state.site.id;
+        document.getElementById("packSiteId").value = state.site.id;
+        document.getElementById("packSiteName").value = state.site.name;
+        document.getElementById("packBaseUrl").value = state.site.baseUrl;
+      }
+      show("siteOut", out);
+    };
+
+    document.getElementById("issueKeyBtn").onclick = async () => {
+      const body = {
+        siteId: document.getElementById("keySiteId").value,
+        environment: document.getElementById("keyEnv").value,
+        kind: document.getElementById("keyKind").value,
+      };
+      const out = await api("/v1/keys/issue", body);
+      state.key = out.data.data || null;
+      show("keyOut", out);
+    };
+
+    document.getElementById("wizardInitBtn").onclick = async () => {
+      const body = {
+        orgName: document.getElementById("wizOrg").value,
+        siteName: document.getElementById("wizSite").value,
+        baseUrl: document.getElementById("wizBaseUrl").value,
+        country: "IN",
+        currency: "INR",
+        languages: ["en-IN"],
+      };
+      const out = await api("/v1/wizard/init", body);
+      show("wizardOut", out);
+      const payload = out.data && out.data.data;
+      if (payload && payload.site) {
+        state.site = payload.site;
+        state.key = payload.publishableKey;
+        document.getElementById("keySiteId").value = payload.site.id;
+        document.getElementById("seoSiteId").value = payload.site.id;
+        document.getElementById("packSiteId").value = payload.site.id;
+        document.getElementById("packSiteName").value = payload.site.name;
+        document.getElementById("packBaseUrl").value = payload.site.baseUrl;
+      }
+    };
+
+    document.getElementById("downloadPackBtn").onclick = async () => {
+      const caps = [];
+      if (document.getElementById("capSearch").checked) caps.push("search");
+      if (document.getElementById("capCategories").checked) caps.push("list_categories");
+      if (document.getElementById("capCart").checked) caps.push("cart");
+      if (document.getElementById("capCheckout").checked) caps.push("checkout");
+
+      const body = {
+        siteId: document.getElementById("packSiteId").value || null,
+        siteName: document.getElementById("packSiteName").value || null,
+        baseUrl: document.getElementById("packBaseUrl").value || null,
+        locales: parseCSV(document.getElementById("packLocales").value),
+        apiBaseUrl: document.getElementById("packApiBase").value || null,
+        sitemapUrl: document.getElementById("packSitemapUrl").value || null,
+        capabilities: caps,
+        includeAuth: true,
+        includeRisk: true,
+      };
+
+      try {
+        const res = await fetch("/v1/wizard/onboarding-pack", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          show("packOut", err.detail || err || "Download failed");
+          return;
+        }
+        const blob = await res.blob();
+        const dispo = res.headers.get("Content-Disposition") || "";
+        const match = dispo.match(/filename="([^"]+)"/);
+        const filename = match ? match[1] : "nina-onboarding-pack.zip";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        show("packOut", "Downloaded " + filename + "\n\nNext: unzip → nina-generate . → nina-validate dist/agent.json --executable");
+      } catch (e) {
+        show("packOut", "Download failed: " + e.message);
+      }
+    };
+
+    document.getElementById("wizardStepsBtn").onclick = async () => {
+      const res = await fetch("/v1/wizard/steps");
+      const data = await res.json();
+      show("wizardOut", data);
+    };
+
+    document.getElementById("seoSitemapBtn").onclick = async () => {
+      const body = {
+        siteId: document.getElementById("seoSiteId").value,
+        rawSitemapXml: document.getElementById("seoXml").value,
+      };
+      const out = await api("/v1/seo/sitemap", body);
+      show("seoOut", out);
+    };
+
+    document.getElementById("seoHealthBtn").onclick = async () => {
+      const out = await api("/v1/seo/embed-health", {
+        siteUrl: document.getElementById("seoSiteUrl").value
+      });
+      show("seoOut", out);
+    };
+
+    document.getElementById("buildSnippetBtn").onclick = () => {
+      if (!state.site || !state.key || !state.key.token) {
+        show("snippetOut", "Create a site and issue a publishable key first.");
+        return;
+      }
+      const apiUrl = (state.site.baseUrl || "").replace(/\/$/, "") + "/v1/query";
+      const manifestUrl = (state.site.baseUrl || "").replace(/\/$/, "") + "/agent.json";
+      const snippet = [
+        '<script src="https://cdn.nina.dev/sdk/nina-bootstrap.js"',
+        '        data-site-id="' + state.site.id + '"',
+        '        data-api="' + apiUrl + '"',
+        '        data-manifest="' + manifestUrl + '"',
+        '        data-api-key="' + state.key.token + '"',
+        '        data-require-api-key="true"',
+        '        data-panel="right"',
+        '        defer><\/script>',
+      ].join("\n");
+      show("snippetOut", snippet);
+    };
+
+    checkHealth();
+  </script>
+</body>
+</html>

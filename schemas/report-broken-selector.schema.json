@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nina.dev/schemas/report-broken-selector.schema.json",
+  "title": "NINA Broken Selector Report",
+  "type": "object",
+  "required": ["siteId", "contractVersion", "pageUrl", "failures"],
+  "additionalProperties": false,
+  "properties": {
+    "siteId": { "type": "string" },
+    "contractVersion": { "type": "string" },
+    "sessionId": { "type": "string" },
+    "pageUrl": { "type": "string", "format": "uri" },
+    "pageId": { "type": "string" },
+    "userAgent": { "type": "string" },
+    "failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["actionId", "stepIndex", "op", "reason"],
+        "properties": {
+          "actionId": { "type": "string" },
+          "stepIndex": { "type": "integer", "minimum": 0 },
+          "op": { "type": "string" },
+          "selector": { "type": "string" },
+          "selectorId": { "type": "string" },
+          "reason": {
+            "type": "string",
+            "enum": ["not_found", "not_visible", "not_interactable", "timeout"]
+          },
+          "intent": { "type": "string" },
+          "params": { "type": "object" }
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "headings": { "type": "array", "items": { "type": "string" } },
+        "visibleLabels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "reportedAt": { "type": "string", "format": "date-time" }
+  }
+}

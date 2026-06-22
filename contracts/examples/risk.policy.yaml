@@ -1,0 +1,8 @@
+confirmActions:
+  - checkout
+  - delete_account
+  - place_order
+blockActions:
+  - export_all_data
+blockPatterns:
+  - "(?i)(password|credit.?card|cvv|ssn)"

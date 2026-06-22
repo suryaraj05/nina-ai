@@ -1,0 +1,165 @@
+{
+  "site": {
+    "id": "dhaaga-thread",
+    "name": "Dhaaga & Thread",
+    "baseUrl": "http://127.0.0.1:8000",
+    "locales": ["en-IN"]
+  },
+  "version": "1.0.0",
+  "description": "Ecommerce demo — NINA contract for split-panel embed on live store DOM.",
+  "pages": [
+    {
+      "id": "home",
+      "urlPattern": "/",
+      "label": "Home",
+      "actions": ["search_products", "filter_products", "navigate", "view_cart"]
+    },
+    {
+      "id": "catalog",
+      "urlPattern": "/*",
+      "label": "Catalog",
+      "actions": [
+        "search_products",
+        "filter_products",
+        "get_product_detail",
+        "add_to_cart",
+        "view_cart"
+      ]
+    }
+  ],
+  "selectors": {
+    "product_grid": "#nina-product-grid",
+    "catalog_section": "#nina-catalog",
+    "cart_drawer": "#nina-cart-drawer",
+    "product_detail": "#nina-product-detail"
+  },
+  "actions": [
+    {
+      "id": "search_products",
+      "description": "Search products by keyword, category, or style",
+      "parameters": {
+        "query": { "type": "string", "required": false },
+        "category": { "type": "string", "required": false }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": ["home", "catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "filter_products",
+      "description": "Filter products by category or tags",
+      "parameters": {
+        "category": { "type": "string", "required": false },
+        "tags": { "type": "string", "required": false }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": ["home", "catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "get_product_detail",
+      "description": "Show details for a product by name or list position",
+      "parameters": {
+        "productId": { "type": "string", "required": false },
+        "name": { "type": "string", "required": false },
+        "position": { "type": "integer", "required": false }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": ["catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "add_to_cart",
+      "description": "Add a product to the shopping cart",
+      "parameters": {
+        "productId": { "type": "string", "required": false },
+        "name": { "type": "string", "required": false },
+        "position": { "type": "integer", "required": false },
+        "qty": { "type": "integer", "required": false }
+      },
+      "risk": "medium",
+      "requiresAuth": false,
+      "availableOn": ["catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "view_cart",
+      "description": "Open and show the shopping cart",
+      "parameters": {},
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": ["home", "catalog"],
+      "execute": {
+        "type": "dom",
+        "steps": [
+          { "op": "click", "selectorId": "cart_drawer" },
+          { "op": "scroll", "selectorId": "cart_drawer" }
+        ]
+      }
+    },
+    {
+      "id": "remove_from_cart",
+      "description": "Remove an item from the cart",
+      "parameters": {
+        "productId": { "type": "string", "required": false },
+        "position": { "type": "integer", "required": false }
+      },
+      "risk": "medium",
+      "requiresAuth": false,
+      "availableOn": ["catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "clear_cart",
+      "description": "Empty the shopping cart",
+      "parameters": {},
+      "risk": "medium",
+      "requiresAuth": false,
+      "availableOn": ["catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "checkout",
+      "description": "Place order and checkout",
+      "parameters": {},
+      "risk": "high",
+      "requiresAuth": false,
+      "availableOn": ["catalog"],
+      "execute": { "type": "hybrid", "steps": [] }
+    },
+    {
+      "id": "navigate",
+      "description": "Scroll to a section on the page",
+      "parameters": {
+        "section": { "type": "string", "required": false }
+      },
+      "risk": "low",
+      "requiresAuth": false,
+      "availableOn": ["home", "catalog"],
+      "execute": {
+        "type": "dom",
+        "steps": [{ "op": "scroll", "selectorId": "catalog_section" }]
+      }
+    }
+  ],
+  "auth": {
+    "loginUrl": "/login.html",
+    "sessionIndicator": {
+      "type": "cookie",
+      "name": "nina_logged_in"
+    },
+    "gatedActions": ["checkout"]
+  },
+  "risk": {
+    "confirmActions": ["checkout"],
+    "blockActions": []
+  },
+  "embed": {
+    "panel": "right",
+    "apiBase": "/v1/query",
+    "manifestUrl": "/agent.json"
+  }
+}

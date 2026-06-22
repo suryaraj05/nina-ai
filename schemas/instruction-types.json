@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nina.dev/schemas/instruction-types.json",
+  "title": "NINA Instruction Types",
+  "description": "Typed instructions returned by the decision API and executed by the browser SDK.",
+  "version": "1.0.0",
+  "types": {
+    "navigate": {
+      "description": "Navigate the browser to a URL (same-origin enforced at API).",
+      "fields": { "url": { "type": "string", "required": true } }
+    },
+    "click": {
+      "description": "Click a DOM element matched by selector.",
+      "fields": {
+        "selector": { "type": "string", "required": true },
+        "selectorId": { "type": "string", "required": false }
+      }
+    },
+    "fill": {
+      "description": "Set input value and dispatch input event.",
+      "fields": {
+        "selector": { "type": "string", "required": true },
+        "value": { "type": "string", "required": true },
+        "param": { "type": "string", "required": false }
+      }
+    },
+    "scroll": {
+      "description": "Scroll element into view.",
+      "fields": {
+        "selector": { "type": "string", "required": true },
+        "block": { "type": "string", "enum": ["start", "center", "end"], "default": "start" }
+      }
+    },
+    "api_call": {
+      "description": "Call a site REST endpoint (credentials: same-origin).",
+      "fields": {
+        "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"], "required": true },
+        "url": { "type": "string", "required": true },
+        "body": { "type": "object", "required": false }
+      }
+    },
+    "show_message": {
+      "description": "Display informational text in the panel (no DOM mutation).",
+      "fields": { "message": { "type": "string", "required": true } }
+    },
+    "toast": {
+      "description": "Transient on-page toast notification.",
+      "fields": {
+        "message": { "type": "string", "required": true },
+        "level": { "type": "string", "enum": ["info", "success", "warning", "error"], "default": "info" }
+      }
+    },
+    "needs_login": {
+      "description": "Redirect or open login; queue intent for replay after auth.",
+      "fields": {
+        "loginUrl": { "type": "string", "required": true },
+        "queuedIntent": { "type": "object", "required": false }
+      }
+    },
+    "no_match": {
+      "description": "Resolver could not map intent safely; suggest manual action.",
+      "fields": {
+        "reason": { "type": "string", "required": true },
+        "suggestion": { "type": "string", "required": false }
+      }
+    },
+    "confirm": {
+      "description": "High-risk action requires user confirmation before execute steps.",
+      "fields": {
+        "actionId": { "type": "string", "required": true },
+        "message": { "type": "string", "required": true },
+        "params": { "type": "object", "required": false }
+      }
+    },
+    "wait": {
+      "description": "Pause before next step (ms).",
+      "fields": { "ms": { "type": "integer", "minimum": 0, "required": true } }
+    },
+    "run_action": {
+      "description": "Execute contract action steps by id with resolved params.",
+      "fields": {
+        "actionId": { "type": "string", "required": true },
+        "params": { "type": "object", "required": false }
+      }
+    }
+  },
+  "executeOps": {
+    "click": { "fields": { "selector": "string", "selectorId": "string" } },
+    "fill": { "fields": { "selector": "string", "selectorId": "string", "param": "string", "value": "string" } },
+    "scroll": { "fields": { "selector": "string", "selectorId": "string", "block": "string" } },
+    "navigate": { "fields": { "url": "string" } },
+    "api_call": { "fields": { "method": "string", "url": "string", "body": "object", "paramMap": "object" } },
+    "wait": { "fields": { "ms": "integer" } },
+    "toast": { "fields": { "message": "string", "level": "string" } }
+  }
+}

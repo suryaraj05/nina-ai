@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nina.dev/schemas/risk.policy.schema.json",
+  "title": "NINA Risk Policy (risk.policy.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "confirmActions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Actions that require explicit user confirmation before execution"
+    },
+    "blockActions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Actions NINA must never execute automatically"
+    },
+    "blockPatterns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Regex patterns on user transcript that trigger block"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NINA Blank Site — API-first example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    header { border-bottom: 1px solid #ddd; padding-bottom: 1rem; margin-bottom: 2rem; }
+    #nina-toasts { position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; }
+    .nina-toast { background: #222; color: #fff; padding: 0.6rem 1rem; border-radius: 6px; margin-top: 0.4rem; opacity: 0; transition: opacity 0.2s; }
+    .nina-toast.show { opacity: 1; }
+    .nina-toast.error { background: #b00020; }
+    .nina-toast.success { background: #1b5e20; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Acme Docs</h1>
+    <p>API-first NINA embed — search and navigation run via <code>/api/*</code>, not DOM selectors.</p>
+  </header>
+  <main id="content">
+    <section id="about">
+      <h2>About</h2>
+      <p>This page uses hand-written agent.json with <code>execute.type: api</code> and server runtime.</p>
+    </section>
+    <section id="contact">
+      <h2>Contact</h2>
+      <p>support@example.com</p>
+    </section>
+    <section id="api">
+      <h2>API-first</h2>
+      <p>Ask NINA to search docs or go to a section — no search input required in the DOM.</p>
+    </section>
+  </main>
+  <div id="nina-toasts" aria-live="polite"></div>
+  <script src="/sdk/nina-bootstrap.js"
+          data-site-id="acme-docs"
+          data-api="/v1/query"
+          data-manifest="/agent.json"
+          defer></script>
+</body>
+</html>

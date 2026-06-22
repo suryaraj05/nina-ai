@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nina.dev/schemas/nina.site.schema.json",
+  "title": "NINA Site Config (nina.site.yaml)",
+  "type": "object",
+  "required": ["site"],
+  "additionalProperties": false,
+  "properties": {
+    "site": {
+      "type": "object",
+      "required": ["id", "name", "baseUrl"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
+        "name": { "type": "string" },
+        "baseUrl": { "type": "string", "format": "uri" },
+        "locales": { "type": "array", "items": { "type": "string" } },
+        "allowedOrigins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sitemap": { "type": "string", "description": "Path to sitemap.xml relative to config dir" },
+        "routesManifest": { "type": "string" },
+        "docsDir": { "type": "string" },
+        "crawl": {
+          "type": "object",
+          "properties": {
+            "maxPages": { "type": "integer", "minimum": 1, "default": 50 },
+            "respectRobots": { "type": "boolean", "default": true },
+            "delayMs": { "type": "integer", "minimum": 0, "default": 500 }
+          }
+        }
+      }
+    },
+    "publish": {
+      "type": "object",
+      "properties": {
+        "outputDir": { "type": "string", "default": "dist" },
+        "uploadUrl": { "type": "string", "format": "uri" }
+      }
+    }
+  }
+}

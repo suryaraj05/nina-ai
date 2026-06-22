@@ -1,0 +1,21 @@
+site:
+  id: dhaaga-thread
+  name: Dhaaga & Thread
+  baseUrl: https://example.com
+  locales:
+    - en-IN
+  allowedOrigins:
+    - https://example.com
+    - http://127.0.0.1:8000
+
+generator:
+  sitemap: sitemap.xml
+  docsDir: docs
+  crawl:
+    maxPages: 50
+    respectRobots: true
+    delayMs: 500
+
+publish:
+  outputDir: dist
+  uploadUrl: ""

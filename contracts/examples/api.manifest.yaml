@@ -1,0 +1,32 @@
+# Developer-declared REST endpoints — generator merges into agent.json as api-first actions.
+apis:
+  default:
+    baseUrl: https://example.com
+    description: Staging catalog API
+
+actions:
+  search:
+    apiId: default
+    method: POST
+    path: /api/v1/products/search
+    runtime: server
+    description: Search the product catalog by keyword or filters
+    parameters:
+      query:
+        type: string
+        required: true
+        description: Search terms
+    bodyTemplate:
+      query: "{query}"
+    risk: low
+    availableOn: [home, product_list]
+
+  list_categories:
+    apiId: default
+    method: GET
+    path: /api/v1/categories
+    runtime: browser
+    description: List product categories for browsing
+    parameters: {}
+    risk: low
+    availableOn: [home, product_list]

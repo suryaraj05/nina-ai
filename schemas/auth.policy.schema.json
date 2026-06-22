@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nina.dev/schemas/auth.policy.schema.json",
+  "title": "NINA Auth Policy (auth.policy.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "loginUrl": { "type": "string", "minLength": 1 },
+    "postLoginRedirect": { "type": "string" },
+    "sessionIndicator": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["cookie", "localStorage", "selector"] },
+        "name": { "type": "string" },
+        "selector": { "type": "string" }
+      }
+    },
+    "gatedActions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Action ids that require an authenticated session"
+    }
+  }
+}

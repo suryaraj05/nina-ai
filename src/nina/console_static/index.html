@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NINA — Add AI to your store</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue: #5b8cff;
+      --blue-dark: #3a6bde;
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --border: #e2e8f4;
+      --text: #1a1e2e;
+      --muted: #6b7594;
+      --ok: #1aab6d;
+      --err: #e0344b;
+      --radius: 14px;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── NAV ── */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    .logo { font-size: 1.35rem; font-weight: 800; letter-spacing: -1px; color: var(--text); }
+    .logo span { color: var(--blue); }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: .9rem; margin-left: 24px; }
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── HERO ── */
+    .hero { text-align: center; padding: 72px 20px 48px; }
+    .hero h1 { font-size: 2.6rem; font-weight: 800; letter-spacing: -.5px; line-height: 1.2; max-width: 620px; margin: 0 auto 16px; }
+    .hero h1 em { color: var(--blue); font-style: normal; }
+    .hero p { color: var(--muted); font-size: 1.1rem; max-width: 480px; margin: 0 auto 36px; line-height: 1.6; }
+
+    /* ── STEPS BAR ── */
+    .steps-bar { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 40px; }
+    .step-item { display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+    .step-item.active { color: var(--blue); }
+    .step-item.done { color: var(--ok); }
+    .step-num { width: 28px; height: 28px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: .78rem; font-weight: 700; flex-shrink: 0; }
+    .step-item.done .step-num { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .step-item.done .step-num::after { content: "✓"; }
+    .step-connector { width: 48px; height: 2px; background: var(--border); margin: 0 4px; }
+    .step-connector.done { background: var(--ok); }
+
+    /* ── CARD ── */
+    .card-wrap { max-width: 520px; margin: 0 auto; padding: 0 20px 80px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    .card h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .card .sub { color: var(--muted); font-size: .9rem; margin-bottom: 28px; line-height: 1.5; }
+
+    /* ── FORM ── */
+    label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+    input[type="text"], input[type="email"], input[type="url"] {
+      width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: .95rem; color: var(--text);
+      background: #fbfcff; outline: none; transition: border-color .15s;
+      margin-bottom: 18px;
+    }
+    input:focus { border-color: var(--blue); background: #fff; }
+    input::placeholder { color: #bcc4d8; }
+
+    /* ── BUTTONS ── */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-size: .95rem; font-weight: 700; transition: background .15s, transform .1s; }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--blue); color: #fff; width: 100%; }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-primary:disabled { opacity: .5; cursor: default; transform: none; }
+    .btn-secondary { background: #f0f3fb; color: var(--text); }
+    .btn-secondary:hover { background: #e4e9f5; }
+    .btn-sm { padding: 7px 14px; font-size: .82rem; border-radius: 8px; }
+
+    /* ── SPINNER ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    .spinner.dark { border-color: rgba(0,0,0,.15); border-top-color: var(--blue); }
+
+    /* ── STATUS BOX ── */
+    .status-box { border-radius: 10px; padding: 12px 16px; font-size: .88rem; margin-bottom: 20px; display: none; }
+    .status-box.err { background: #fff2f4; border: 1px solid #f8c3cb; color: var(--err); display: block; }
+    .status-box.ok  { background: #f0fdf6; border: 1px solid #a7eacc; color: var(--ok); display: block; }
+    .status-box.info { background: #eff4ff; border: 1px solid #c0d2ff; color: var(--blue); display: block; }
+
+    /* ── CODE BLOCK ── */
+    .code-block { position: relative; background: #111827; border-radius: 10px; padding: 16px; margin: 14px 0; }
+    .code-block pre { color: #e2e8f4; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+    .copy-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #ccc; border-radius: 6px; padding: 4px 10px; font-size: .75rem; cursor: pointer; font-weight: 600; }
+    .copy-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+    .copy-btn.copied { background: #1aab6d; border-color: #1aab6d; color: #fff; }
+
+    /* ── KEY DISPLAY ── */
+    .key-box { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 14px 0; }
+    .key-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; flex: 1; color: var(--text); word-break: break-all; }
+    .key-text.masked { letter-spacing: 3px; color: var(--muted); }
+    .key-reveal { background: none; border: none; cursor: pointer; color: var(--blue); font-size: .82rem; font-weight: 600; white-space: nowrap; }
+
+    /* ── METRIC CHIPS ── */
+    .metrics { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .metric { flex: 1; min-width: 100px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+    .metric .val { font-size: 1.5rem; font-weight: 800; }
+    .metric .lbl { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+
+    /* ── SUCCESS ICON ── */
+    .success-icon { width: 56px; height: 56px; border-radius: 50%; background: #f0fdf6; border: 2px solid #a7eacc; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 18px; }
+
+    /* ── FOOTER ── */
+    footer { text-align: center; padding: 24px; color: var(--muted); font-size: .82rem; border-top: 1px solid var(--border); }
+    footer a { color: var(--blue); text-decoration: none; }
+
+    /* ── HIDE/SHOW ── */
+    [data-step] { display: none; }
+    [data-step].active { display: block; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">N<span>I</span>NA</div>
+  <div class="nav-links">
+    <a href="/admin.html">Admin console</a>
+    <a href="https://docs.nina.ai" target="_blank">Docs</a>
+  </div>
+</nav>
+
+<div class="hero" id="heroSection">
+  <h1>Add <em>conversational AI</em> to any store in minutes</h1>
+  <p>One script tag. No backend changes. Your customers chat, NINA handles search, cart, and checkout — powered by your own product data.</p>
+</div>
+
+<!-- Steps bar -->
+<div class="steps-bar" id="stepsBar">
+  <div class="step-item active" id="stepItem1">
+    <div class="step-num">1</div>
+    <span>Your store</span>
+  </div>
+  <div class="step-connector" id="conn1"></div>
+  <div class="step-item" id="stepItem2">
+    <div class="step-num">2</div>
+    <span>AI setup</span>
+  </div>
+  <div class="step-connector" id="conn2"></div>
+  <div class="step-item" id="stepItem3">
+    <div class="step-num">3</div>
+    <span>Install</span>
+  </div>
+</div>
+
+<div class="card-wrap">
+
+  <!-- STEP 1: Store details -->
+  <div data-step="1" class="active">
+    <div class="card">
+      <h2>Tell us about your store</h2>
+      <p class="sub">We'll create a NINA account for you and configure your AI assistant.</p>
+
+      <div id="step1Status" class="status-box"></div>
+
+      <label for="storeName">Store name</label>
+      <input type="text" id="storeName" placeholder="Acme Fashion" autocomplete="organization">
+
+      <label for="storeUrl">Store URL</label>
+      <input type="url" id="storeUrl" placeholder="https://shop.acme.com" autocomplete="url">
+
+      <label for="ownerEmail">Your email</label>
+      <input type="email" id="ownerEmail" placeholder="you@acme.com" autocomplete="email">
+
+      <button class="btn btn-primary" id="step1Btn">
+        Get started <span>→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2: AI config / contract -->
+  <div data-step="2">
+    <div class="card">
+      <h2>Configuring your AI</h2>
+      <p class="sub">NINA needs to learn your store's capabilities — what it can search, add to cart, or look up. Choose how to configure it.</p>
+
+      <div id="step2Status" class="status-box"></div>
+
+      <!-- Option A: auto-generate -->
+      <div id="autoGenSection">
+        <p style="font-size:.88rem;color:var(--muted);margin-bottom:14px;">
+          <strong style="color:var(--text)">Option A — Auto-generate</strong><br>
+          We'll scan your store's API and infer the capabilities automatically.
+        </p>
+        <label for="apiBaseUrl">API base URL <span style="font-weight:400;color:var(--muted)">(optional, defaults to store URL)</span></label>
+        <input type="url" id="apiBaseUrl" placeholder="https://shop.acme.com/api">
+        <button class="btn btn-primary" id="generateBtn" style="margin-bottom:18px;">
+          Auto-generate AI config
+        </button>
+      </div>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:.8rem;color:var(--muted)">or</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <!-- Option B: upload contract -->
+      <p style="font-size:.88rem;color:var(--muted);margin-bottom:12px;">
+        <strong style="color:var(--text)">Option B — Upload agent.json</strong><br>
+        Already have a contract? Paste or upload it below.
+      </p>
+      <div style="position:relative;margin-bottom:14px;">
+        <textarea id="contractJson" placeholder='Paste your agent.json here…'
+          style="width:100%;min-height:100px;resize:vertical;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:ui-monospace,monospace;font-size:.8rem;background:#fbfcff;outline:none;color:var(--text)"></textarea>
+      </div>
+      <button class="btn btn-secondary" id="uploadContractBtn" style="width:100%;margin-bottom:0;">
+        Upload contract
+      </button>
+
+      <div style="margin-top:18px;text-align:center;">
+        <button class="btn btn-secondary btn-sm" id="skipContractBtn">Skip for now — I'll do this later</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Done — show script tag -->
+  <div data-step="3">
+    <div class="card">
+      <div class="success-icon">✓</div>
+      <h2 style="text-align:center;margin-bottom:6px;">NINA is ready</h2>
+      <p class="sub" style="text-align:center">Add this one line to your store's HTML — right before <code style="font-size:.85em;background:#f0f3fb;padding:2px 6px;border-radius:4px;">&lt;/body&gt;</code></p>
+
+      <div class="code-block">
+        <pre id="snippetCode"></pre>
+        <button class="copy-btn" id="copySnippetBtn">Copy</button>
+      </div>
+
+      <div style="margin:20px 0 0;padding:14px;background:#eff4ff;border-radius:10px;font-size:.85rem;color:var(--blue);">
+        💡 That's it. Your visitors will see a chat button. They can search products, add to cart, and check out — all through conversation.
+      </div>
+
+      <div style="margin-top:24px;">
+        <p style="font-size:.85rem;font-weight:600;margin-bottom:10px;color:var(--muted)">YOUR API KEY</p>
+        <div class="key-box">
+          <span class="key-text masked" id="keyDisplay">••••••••••••••••••••••••</span>
+          <button class="key-reveal" id="keyRevealBtn">Reveal</button>
+          <button class="copy-btn" id="copyKeyBtn" style="position:static;background:#f0f3fb;border-color:var(--border);color:var(--text);">Copy</button>
+        </div>
+      </div>
+
+      <div id="usageSection" class="metrics hidden">
+        <div class="metric">
+          <div class="val" id="metricCalls">0</div>
+          <div class="lbl">Total conversations</div>
+        </div>
+        <div class="metric">
+          <div class="val" id="metricLast">—</div>
+          <div class="lbl">Last active</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" id="refreshUsageBtn">Refresh usage</button>
+        <a href="/admin.html" class="btn btn-secondary btn-sm" style="text-decoration:none">Admin console</a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .card-wrap -->
+
+<footer>
+  NINA &copy; 2025 &mdash; <a href="/admin.html">Admin</a>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── State ──
+  const S = { org: null, site: null, keyToken: null, keyId: null, siteId: null };
+
+  // ── Helpers ──
+  function show(id, msg, type) {
+    const el = document.getElementById(id);
+    el.className = 'status-box ' + (type || 'info');
+    el.textContent = msg;
+  }
+  function hideStatus(id) {
+    document.getElementById(id).className = 'status-box';
+  }
+
+  // Admin secret — sent with all console API calls when NINA_CONSOLE_ADMIN_SECRET is set.
+  // Stored in sessionStorage so the prompt only appears once per browser tab.
+  let _adminSecret = sessionStorage.getItem('nina_admin_secret') || '';
+
+  async function api(path, body, method) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (_adminSecret) headers['Authorization'] = 'Bearer ' + _adminSecret;
+    const res = await fetch(path, {
+      method: method || (body !== undefined ? 'POST' : 'GET'),
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) {
+      // Secret not set or wrong — prompt the operator once and retry.
+      const secret = prompt('Enter NINA Console admin secret (set via NINA_CONSOLE_ADMIN_SECRET):');
+      if (secret) {
+        _adminSecret = secret;
+        sessionStorage.setItem('nina_admin_secret', secret);
+        return api(path, body, method);
+      }
+    }
+    return res.json();
+  }
+
+  function setStep(n) {
+    document.querySelectorAll('[data-step]').forEach(el => el.classList.remove('active'));
+    document.querySelector('[data-step="' + n + '"]').classList.add('active');
+
+    // Steps bar
+    for (let i = 1; i <= 3; i++) {
+      const item = document.getElementById('stepItem' + i);
+      item.classList.remove('active', 'done');
+      if (i < n) { item.classList.add('done'); item.querySelector('.step-num').textContent = ''; }
+      else if (i === n) item.classList.add('active');
+    }
+    for (let i = 1; i <= 2; i++) {
+      document.getElementById('conn' + i).classList.toggle('done', i < n);
+    }
+    if (n === 3) document.getElementById('heroSection').style.display = 'none';
+  }
+
+  function setLoading(btnId, loading, defaultHtml) {
+    const btn = document.getElementById(btnId);
+    if (loading) {
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Working…';
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = defaultHtml;
+    }
+  }
+
+  function buildSnippet(siteId, apiKey) {
+    const base = window.location.origin;
+    return [
+      '<script src="' + base + '/sdk/nina-bootstrap.js"',
+      '        data-site-id="' + siteId + '"',
+      '        data-api="' + base + '"',
+      '        data-api-key="' + apiKey + '"',
+      '        defer><\/script>',
+    ].join('\n');
+  }
+
+  async function goToStep3() {
+    document.getElementById('snippetCode').textContent = buildSnippet(S.siteId, S.keyToken);
+    setStep(3);
+    await refreshUsage();
+  }
+
+  async function refreshUsage() {
+    if (!S.siteId) return;
+    try {
+      const d = await api('/v1/sites/' + S.siteId + '/usage');
+      if (d.ok) {
+        document.getElementById('metricCalls').textContent = d.data.calls || 0;
+        const ts = d.data.lastCallAt;
+        document.getElementById('metricLast').textContent = ts ? new Date(ts * 1000).toLocaleString() : '—';
+        document.getElementById('usageSection').classList.remove('hidden');
+      }
+    } catch (_) {}
+  }
+
+  // ── Step 1 ──
+  document.getElementById('step1Btn').onclick = async function () {
+    const name  = document.getElementById('storeName').value.trim();
+    const url   = document.getElementById('storeUrl').value.trim();
+    const email = document.getElementById('ownerEmail').value.trim();
+
+    if (!name || !url) { show('step1Status', 'Please enter your store name and URL.', 'err'); return; }
+    if (url && !url.startsWith('http')) { show('step1Status', 'Store URL must start with http:// or https://', 'err'); return; }
+
+    setLoading('step1Btn', true, 'Get started <span>→</span>');
+    hideStatus('step1Status');
+
+    try {
+      const res = await api('/v1/wizard/init', {
+        orgName: name, ownerEmail: email || null, siteName: name,
+        baseUrl: url, country: 'IN', currency: 'INR', languages: ['en', 'hi'],
+      });
+      if (!res.ok) { show('step1Status', (res.detail || (res.data && res.data.message) || 'Something went wrong.'), 'err'); setLoading('step1Btn', false, 'Get started <span>→</span>'); return; }
+      S.org     = res.data.org;
+      S.site    = res.data.site;
+      S.siteId  = res.data.site.id;
+      S.keyToken = res.data.publishableKey.token;
+      S.keyId    = res.data.publishableKey.id;
+
+      // Pre-fill step 2 API URL
+      document.getElementById('apiBaseUrl').value = url;
+      setStep(2);
+    } catch (e) {
+      show('step1Status', 'Network error: ' + e.message, 'err');
+    } finally {
+      setLoading('step1Btn', false, 'Get started <span>→</span>');
+    }
+  };
+
+  // ── Step 2: Auto-generate ──
+  document.getElementById('generateBtn').onclick = async function () {
+    const apiUrl = document.getElementById('apiBaseUrl').value.trim() || S.site.baseUrl;
+    setLoading('generateBtn', true, 'Auto-generate AI config');
+    show('step2Status', 'Scanning your store… this takes about 30 seconds.', 'info');
+    try {
+      const res = await api('/v1/sites/' + S.siteId + '/generate-from-url', { apiBaseUrl: apiUrl });
+      if (res.ok) {
+        show('step2Status', 'AI configured successfully!', 'ok');
+        setTimeout(goToStep3, 800);
+      } else {
+        const errMsg = (res.errors && res.errors[0]) || (res.error && res.error.message) || 'Generation failed.';
+        show('step2Status', errMsg + ' — you can still install NINA and upload a contract later.', 'err');
+        setTimeout(goToStep3, 2000);
+      }
+    } catch (e) {
+      show('step2Status', 'Network error — you can still install and configure later.', 'err');
+      setTimeout(goToStep3, 1500);
+    } finally {
+      setLoading('generateBtn', false, 'Auto-generate AI config');
+    }
+  };
+
+  // ── Step 2: Upload contract ──
+  document.getElementById('uploadContractBtn').onclick = async function () {
+    const raw = document.getElementById('contractJson').value.trim();
+    if (!raw) { show('step2Status', 'Paste your agent.json content first.', 'err'); return; }
+    let contract;
+    try { contract = JSON.parse(raw); } catch (_) { show('step2Status', 'Invalid JSON — check your agent.json.', 'err'); return; }
+
+    setLoading('uploadContractBtn', true, 'Upload contract');
+    try {
+      const res = await api('/v1/sites/' + S.siteId + '/contract', { contract }, 'PUT');
+      if (res.ok) { show('step2Status', 'Contract uploaded!', 'ok'); setTimeout(goToStep3, 600); }
+      else { show('step2Status', (res.detail || 'Upload failed.'), 'err'); }
+    } catch (e) {
+      show('step2Status', 'Upload error: ' + e.message, 'err');
+    } finally {
+      setLoading('uploadContractBtn', false, 'Upload contract');
+    }
+  };
+
+  // ── Step 2: Skip ──
+  document.getElementById('skipContractBtn').onclick = () => goToStep3();
+
+  // ── Step 3: Copy snippet ──
+  document.getElementById('copySnippetBtn').onclick = function () {
+    const text = document.getElementById('snippetCode').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      this.textContent = 'Copied!';
+      this.classList.add('copied');
+      setTimeout(() => { this.textContent = 'Copy'; this.classList.remove('copied'); }, 2000);
+    });
+  };
+
+  // ── Step 3: Key reveal / copy ──
+  let keyRevealed = false;
+  document.getElementById('keyRevealBtn').onclick = function () {
+    keyRevealed = !keyRevealed;
+    const disp = document.getElementById('keyDisplay');
+    disp.textContent = keyRevealed ? S.keyToken : '••••••••••••••••••••••••';
+    disp.className = 'key-text' + (keyRevealed ? '' : ' masked');
+    this.textContent = keyRevealed ? 'Hide' : 'Reveal';
+  };
+  document.getElementById('copyKeyBtn').onclick = function () {
+    navigator.clipboard.writeText(S.keyToken || '').then(() => {
+      this.textContent = 'Copied!';
+      setTimeout(() => { this.textContent = 'Copy'; }, 1500);
+    });
+  };
+
+  // ── Step 3: Refresh usage ──
+  document.getElementById('refreshUsageBtn').onclick = refreshUsage;
+
+})();
+</script>
+</body>
+</html>

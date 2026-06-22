@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  nina-console:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      # ── Required in production ──────────────────────────────────────────
+      # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      NINA_ENCRYPT_KEY: ${NINA_ENCRYPT_KEY:-}
+
+      # Secret for hashing API keys — change before going live
+      NINA_CONSOLE_KEY_HASH_SECRET: ${NINA_CONSOLE_KEY_HASH_SECRET:-nina-change-me}
+
+      # Secret required by /v1/keys/verify callers
+      NINA_CONSOLE_VERIFY_SECRET: ${NINA_CONSOLE_VERIFY_SECRET:-}
+
+      # ── Default LLM (operator's key — powers free-tier merchants) ──────
+      # JSON: '{"provider":"openai","model":"gpt-4o-mini","apiKey":"sk-..."}'
+      NINA_DEFAULT_LLM_CONFIG: ${NINA_DEFAULT_LLM_CONFIG:-}
+
+      # ── Redis session store (recommended for multi-instance) ────────────
+      NINA_REDIS_URL: ${NINA_REDIS_URL:-}
+
+      # ── Persistence ─────────────────────────────────────────────────────
+      NINA_CONSOLE_STORE_PATH: /data/nina_console_store.json
+    volumes:
+      - nina-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional Redis — uncomment when ready for multi-instance
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   volumes:
+  #     - nina-redis:/data
+  #   command: redis-server --appendonly yes
+
+volumes:
+  nina-data:
+  # nina-redis:

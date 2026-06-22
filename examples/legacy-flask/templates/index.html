@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dhaaga &amp; Thread (legacy) — NINA</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 15px/1.5 Georgia, "Times New Roman", serif; background: #faf8f4;
+         color: #2b2b2b; height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 12px 18px; border-bottom: 2px solid #2b2b2b;
+           background: #fff; }
+  header small { color: #777; }
+  #thread { flex: 1; overflow-y: auto; padding: 18px; max-width: 760px;
+            width: 100%; margin: 0 auto; display: flex;
+            flex-direction: column; gap: 10px; }
+  .msg { max-width: 80%; padding: 8px 12px; border: 1px solid #ccc;
+         background: #fff; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: #eef3ee; }
+  .msg.clarify { border: 2px solid #b58900; background: #fdf6e3; }
+  .msg.clarify::before { content: "Question: "; font-weight: bold;
+                         color: #b58900; }
+  .cards { display: grid; gap: 8px; width: 100%;
+           grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .card { border: 1px solid #ccc; background: #fff; padding: 10px; }
+  .card b { display: block; }
+  .card .cat { color: #777; font-size: 12px; text-transform: capitalize; }
+  .card .tags { font-size: 12px; color: #555; }
+  .cart { border: 1px solid #ccc; background: #fff; padding: 10px 12px;
+          min-width: 260px; }
+  .cart div { display: flex; justify-content: space-between; gap: 16px;
+              padding: 2px 0; }
+  .cart div:last-child { border-top: 1px solid #ccc; font-weight: bold;
+                         padding-top: 6px; }
+  .confirm button { font: inherit; padding: 4px 16px; margin-right: 8px;
+                    cursor: pointer; }
+  .order { border: 1px dashed #2b6e2b; color: #2b6e2b; padding: 8px 12px;
+           background: #fff; }
+  form { display: flex; gap: 8px; padding: 12px 18px; max-width: 760px;
+         width: 100%; margin: 0 auto; border-top: 1px solid #ccc;
+         background: #fff; }
+  input { flex: 1; font: inherit; padding: 8px 10px; border: 1px solid #999; }
+  form button { font: inherit; padding: 8px 18px; cursor: pointer; }
+  .error { color: #a33; }
+</style>
+</head>
+<body>
+<header><b>Dhaaga &amp; Thread</b> <small>— legacy storefront · NINA demo</small></header>
+<div id="thread"></div>
+<form id="form">
+  <input id="input" placeholder="Ask the store assistant…" autocomplete="off" autofocus>
+  <button type="submit">Send</button>
+</form>
+<script>
+const sessionId = crypto.randomUUID(); // memory-only, per page load
+const thread = document.getElementById("thread");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const el = (t, c, x) => { const n = document.createElement(t);
+  if (c) n.className = c; if (x !== undefined) n.textContent = x; return n; };
+const append = n => { thread.appendChild(n); thread.scrollTop = thread.scrollHeight; };
+const inr = n => "₹" + Number(n).toLocaleString("en-IN");
+
+function renderTurn(turn) {
+  append(el("div", "msg" + (turn.intent === "clarification" ? " clarify" : ""),
+            turn.naturalLanguageResponse));
+  const ar = turn.actionResult;
+  if (ar && Array.isArray(ar.results)) {
+    const grid = el("div", "cards");
+    for (const p of ar.results) {
+      const c = el("div", "card");
+      c.appendChild(el("b", "", p.name));
+      c.appendChild(el("div", "cat", p.category + " · " + inr(p.price)));
+      c.appendChild(el("div", "tags", (p.tags || []).join(", ")));
+      if (p.in_stock === false) c.appendChild(el("div", "error", "out of stock"));
+      grid.appendChild(c);
+    }
+    append(grid);
+  } else if (ar && ar.cart) {
+    const box = el("div", "cart");
+    for (const it of ar.cart.items) {
+      const r = el("div"); r.appendChild(el("span", "", it.name + " × " + it.qty));
+      r.appendChild(el("span", "", inr(it.subtotal))); box.appendChild(r);
+    }
+    const t = el("div"); t.appendChild(el("span", "", "Total"));
+    t.appendChild(el("span", "", inr(ar.cart.total))); box.appendChild(t);
+    append(box);
+  } else if (ar && ar.orderId) {
+    append(el("div", "order", "Order placed — " + ar.orderId +
+              " · " + inr(ar.total)));
+  }
+  if (turn.intent === "confirmation") {
+    const w = el("div", "confirm");
+    [["Yes", "yes"], ["No", "no"]].forEach(([label, reply]) => {
+      const b = el("button", "", label);
+      b.onclick = () => { w.querySelectorAll("button")
+        .forEach(x => x.disabled = true); send(reply); };
+      w.appendChild(b);
+    });
+    append(w);
+  }
+}
+
+async function send(text) {
+  append(el("div", "msg user", text));
+  try {
+    const r = await fetch("/chat", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, sessionId }) });
+    const envelope = await r.json();
+    if (envelope.ok) renderTurn(envelope.data);
+    else append(el("div", "msg error",
+      envelope.error.code + ": " + envelope.error.message));
+  } catch (e) { append(el("div", "msg error", "Network error.")); }
+}
+
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  const t = input.value.trim();
+  if (!t) return;
+  input.value = "";
+  send(t);
+});
+</script>
+</body>
+</html>

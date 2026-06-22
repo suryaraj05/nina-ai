@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sign in — Dhaaga & Thread</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 400px; margin: 4rem auto; padding: 1rem; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Sign in</h1>
+  <p>Demo login — sets session cookie for NINA auth replay testing.</p>
+  <p><a href="/">Back to store</a></p>
+  <button type="button" id="demo-login">Sign in (demo)</button>
+  <script>
+    document.getElementById("demo-login").onclick = function () {
+      document.cookie = "nina_logged_in=1; path=/; max-age=3600";
+      window.location.href = "/";
+    };
+  </script>
+</body>
+</html>
