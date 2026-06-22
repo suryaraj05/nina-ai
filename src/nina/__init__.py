@@ -104,8 +104,14 @@ class Nina:
                 from .errors import LLMError
 
                 if isinstance(exc, LLMError):
-                    return fail(exc.code, exc.message, exc.details)
-                return fail("NINA_LLM_UNREACHABLE", str(exc))
+                    # Rate limiting means the key is valid but the quota is temporarily
+                    # exhausted. Don't block init — the first real query will handle it.
+                    if exc.code == "NINA_LLM_RATE_LIMITED":
+                        pass
+                    else:
+                        return fail(exc.code, exc.message, exc.details)
+                else:
+                    return fail("NINA_LLM_UNREACHABLE", str(exc))
 
         self._core.instance_id = str(uuid.uuid4())
         self._core.initialized = True
