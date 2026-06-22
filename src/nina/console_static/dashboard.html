@@ -249,34 +249,50 @@
     <!-- ── Contract ── -->
     <div class="card full">
       <h3><span class="section-icon icon-orange">📋</span> Agent contract</h3>
-      <p class="card-sub">Tells NINA what your store's API can do — product search, orders, cart, etc. Auto-scan reads your live OpenAPI docs.</p>
+      <p class="card-sub">NINA needs to know your store's API routes. Run the <code style="background:#f0f3fb;padding:1px 6px;border-radius:4px;">nina-scan</code> CLI on your source code, then upload the generated file here.</p>
       <div id="contractStatus" class="status"></div>
 
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('scan',this)">Auto-scan my API</button>
-        <button class="tab" onclick="switchTab('paste',this)">Paste contract JSON</button>
+      <!-- Step 1: install + run CLI -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px;">
+        <p style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text);">Step 1 — Run this in your project folder</p>
+        <div class="code-block" style="margin:0;">
+          <pre>pip install nina-sdk
+nina-scan . --output nina-manifest.json</pre>
+          <button class="copy-btn" onclick="copyText('pip install nina-sdk\nnina-scan . --output nina-manifest.json', this)">Copy</button>
+        </div>
+        <p style="font-size:.76rem;color:var(--muted);margin-top:10px;">Supports FastAPI · Django · Flask · Express · Laravel · Rails. Scans your source code locally — nothing is uploaded except the route structure.</p>
       </div>
 
-      <!-- Scan tab -->
-      <div id="tabScan">
-        <label for="scanUrl">Your API's OpenAPI URL</label>
-        <input type="url" id="scanUrl" placeholder="https://yourstore.com/openapi.json">
-        <p style="font-size:.78rem;color:var(--muted);margin-top:6px;">
-          FastAPI: <code>/openapi.json</code> &nbsp;·&nbsp; Django/DRF: <code>/api/schema/</code> &nbsp;·&nbsp; Laravel: <code>/api/documentation</code>
-        </p>
-        <button class="btn btn-primary btn-full" id="scanBtn" onclick="doScan()" style="margin-top:14px;">
-          Auto-scan and configure
-        </button>
+      <!-- Step 2: upload file -->
+      <p style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text);">Step 2 — Upload the generated <code style="font-weight:400;background:#f0f3fb;padding:1px 5px;border-radius:4px;">nina-manifest.json</code></p>
+
+      <div id="dropZone" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;"
+           onclick="document.getElementById('manifestFile').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--blue)';this.style.background='var(--blue-light)'"
+           ondragleave="this.style.borderColor='';this.style.background=''"
+           ondrop="onFileDrop(event)">
+        <div style="font-size:1.8rem;margin-bottom:8px;">📄</div>
+        <p style="font-size:.88rem;font-weight:600;color:var(--text);">Drop <code>nina-manifest.json</code> here</p>
+        <p style="font-size:.78rem;color:var(--muted);margin-top:4px;">or click to browse</p>
+        <input type="file" id="manifestFile" accept=".json" style="display:none" onchange="onFileSelect(event)">
       </div>
 
-      <!-- Paste tab -->
-      <div id="tabPaste" class="hidden">
-        <label for="contractJson">Agent contract JSON</label>
-        <textarea id="contractJson" rows="8" placeholder='{"actions": [{"id": "search_products", ...}]}'></textarea>
-        <button class="btn btn-primary btn-full" id="pasteBtn" onclick="uploadContract()" style="margin-top:10px;">
-          Upload contract
-        </button>
+      <div id="filePreview" class="hidden" style="margin-top:12px;padding:12px 14px;background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:8px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.1rem;">✓</span>
+        <span id="fileName" style="font-size:.85rem;font-weight:600;color:var(--ok);flex:1;"></span>
+        <button class="btn btn-secondary btn-sm" onclick="clearFile()">Clear</button>
       </div>
+
+      <button class="btn btn-primary btn-full" id="uploadBtn" onclick="uploadManifest()" style="margin-top:14px;">
+        Upload and configure NINA
+      </button>
+
+      <div class="divider"><span>or paste JSON manually</span></div>
+
+      <textarea id="contractJson" rows="5" placeholder='Paste nina-manifest.json content here…'></textarea>
+      <button class="btn btn-secondary" id="pasteBtn" onclick="uploadContract()" style="width:100%;margin-top:8px;">
+        Upload pasted JSON
+      </button>
     </div>
 
     <!-- ── API Keys ── -->
@@ -577,30 +593,58 @@ window.issueNewKey = async function() {
 };
 
 // ── Contract ─────────────────────────────────────────────────────────────────
-window.switchTab = function(tab, btn) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tabScan').classList.toggle('hidden', tab !== 'scan');
-  document.getElementById('tabPaste').classList.toggle('hidden', tab !== 'paste');
+let _manifestData = null;
+
+window.copyText = function(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
 };
 
-window.doScan = async function() {
-  const url = document.getElementById('scanUrl').value.trim();
-  if (!url) { setStatus('contractStatus','Enter your OpenAPI URL first.','err'); return; }
-  setLoading('scanBtn', true, 'Auto-scan and configure');
-  setStatus('contractStatus', 'Scanning your API — this can take up to 30 seconds…', 'info');
-  try {
-    const res = await api('/v1/auth/sites/' + S.siteId + '/generate-from-url', { apiBaseUrl: url });
-    if (res.ok) {
-      setStatus('contractStatus', 'Contract generated and saved! NINA now knows your store\'s capabilities.', 'ok');
-    } else {
-      const msg = (res.errors && res.errors[0]) || res.error?.message || 'Scan failed.';
-      setStatus('contractStatus', msg + ' — try pasting your contract manually instead.', 'err');
+function loadManifestFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      _manifestData = JSON.parse(e.target.result);
+      document.getElementById('filePreview').classList.remove('hidden');
+      document.getElementById('fileName').textContent = file.name + ' — ' + JSON.stringify(_manifestData).length + ' bytes';
+      document.getElementById('dropZone').style.display = 'none';
+      clearStatus('contractStatus');
+    } catch(_) {
+      setStatus('contractStatus', 'Invalid JSON in file. Make sure you\'re uploading nina-manifest.json.', 'err');
     }
+  };
+  reader.readAsText(file);
+}
+
+window.onFileSelect = function(e) { loadManifestFile(e.target.files[0]); };
+window.onFileDrop   = function(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor = '';
+  document.getElementById('dropZone').style.background  = '';
+  loadManifestFile(e.dataTransfer.files[0]);
+};
+window.clearFile = function() {
+  _manifestData = null;
+  document.getElementById('filePreview').classList.add('hidden');
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('manifestFile').value = '';
+};
+
+window.uploadManifest = async function() {
+  if (!_manifestData) { setStatus('contractStatus', 'Drop or select your nina-manifest.json first.', 'err'); return; }
+  setLoading('uploadBtn', true, 'Upload and configure NINA');
+  clearStatus('contractStatus');
+  try {
+    const res = await api('/v1/auth/sites/' + S.siteId + '/contract', { contract: _manifestData }, 'PUT');
+    if (res.ok) setStatus('contractStatus', 'Contract uploaded! NINA now knows your store\'s capabilities.', 'ok');
+    else setStatus('contractStatus', res.detail || 'Upload failed.', 'err');
   } catch(e) {
     setStatus('contractStatus', 'Network error: ' + e.message, 'err');
   } finally {
-    setLoading('scanBtn', false, 'Auto-scan and configure');
+    setLoading('uploadBtn', false, 'Upload and configure NINA');
   }
 };
 
