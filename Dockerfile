@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-RUN pip install --no-cache-dir -e ".[all]" 2>/dev/null || pip install --no-cache-dir -e . \
-    && pip install --no-cache-dir uvicorn[standard] redis cryptography sentry-sdk psycopg2-binary
+RUN pip install --no-cache-dir -e . \
+    && pip install --no-cache-dir fastapi>=0.110 uvicorn[standard] redis cryptography sentry-sdk psycopg2-binary
 
 # Expose console port
 EXPOSE 8787
