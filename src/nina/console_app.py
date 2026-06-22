@@ -977,6 +977,105 @@ def create_app() -> FastAPI:
         sites = STORE.list_sites(org_id=org["id"])
         return {"ok": True, "data": {"org": {k: v for k, v in org.items() if k != "dashboardTokenDigest"}, "sites": sites}}
 
+    def _require_dashboard_token(authorization: str | None) -> dict[str, Any]:
+        """Validate dashboard token and return org. Raises 401 on failure."""
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Dashboard token required.")
+        raw = authorization.removeprefix("Bearer ").strip()
+        org = STORE.verify_dashboard_token(raw)
+        if not org:
+            raise HTTPException(status_code=401, detail="Invalid or expired dashboard token.")
+        return org
+
+    def _require_site_ownership(org: dict[str, Any], site_id: str) -> dict[str, Any]:
+        """Confirm org owns site_id. Raises 403 if not."""
+        site = STORE.get_site(site_id)
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found.")
+        if site.get("orgId") != org["id"]:
+            raise HTTPException(status_code=403, detail="Access denied.")
+        return site
+
+    @app.get("/v1/auth/sites/{site_id}/usage")
+    def merchant_get_usage(site_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, site_id)
+        usage = STORE.get_usage(site_id)
+        plan = STORE.get_site(site_id).get("plan", "free")
+        return {"ok": True, "data": {**(usage or {}), "plan": plan}}
+
+    @app.get("/v1/auth/sites/{site_id}/keys")
+    def merchant_list_keys(site_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, site_id)
+        return {"ok": True, "data": STORE.list_api_keys_for_site(site_id)}
+
+    @app.put("/v1/auth/sites/{site_id}/llm-config")
+    def merchant_set_llm_config(site_id: str, body: SiteLlmConfigIn, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, site_id)
+        try:
+            STORE.attach_llm_config(site_id, body.llmConfig)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        POOL.evict(site_id)
+        return {"ok": True, "data": {"siteId": site_id, "llmConfigAttached": True}}
+
+    @app.put("/v1/auth/sites/{site_id}/contract")
+    def merchant_set_contract(site_id: str, body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, site_id)
+        contract = body.get("contract")
+        if not contract:
+            raise HTTPException(status_code=400, detail="contract field required.")
+        try:
+            STORE.attach_contract(site_id, contract)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        POOL.evict(site_id)
+        return {"ok": True, "data": {"siteId": site_id, "contractAttached": True}}
+
+    @app.post("/v1/auth/keys/issue")
+    def merchant_issue_key(body: KeyIssueIn, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, body.siteId)
+        try:
+            rec = STORE.issue_api_key(body.siteId, body.environment, body.kind)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "data": rec}
+
+    @app.post("/v1/auth/keys/{key_id}/revoke")
+    def merchant_revoke_key(key_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        key = STORE.get_api_key(key_id)
+        if not key:
+            raise HTTPException(status_code=404, detail="Key not found.")
+        _require_site_ownership(org, key["siteId"])
+        try:
+            STORE.revoke_api_key(key_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return {"ok": True, "data": {"keyId": key_id, "revoked": True}}
+
+    @app.post("/v1/auth/sites/{site_id}/generate-from-url")
+    async def merchant_generate_from_url(site_id: str, body: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        org = _require_dashboard_token(authorization)
+        _require_site_ownership(org, site_id)
+        api_base_url = body.get("apiBaseUrl", "")
+        if not api_base_url:
+            raise HTTPException(status_code=400, detail="apiBaseUrl required.")
+        from .openapi_probe import fetch_openapi_spec, spec_to_actions
+        try:
+            spec = fetch_openapi_spec(api_base_url if "openapi" in api_base_url else api_base_url.rstrip("/") + "/openapi.json")
+            actions = spec_to_actions(spec)
+            contract = {"actions": actions}
+            STORE.attach_contract(site_id, contract)
+            POOL.evict(site_id)
+            return {"ok": True, "data": {"siteId": site_id, "actionsFound": len(actions)}}
+        except Exception as exc:
+            return {"ok": False, "errors": [str(exc)]}
+
     @app.post("/v1/auth/rotate-token")
     def auth_rotate_token(body: dict[str, Any]) -> dict[str, Any]:
         """Rotate a merchant's dashboard token. Requires admin secret (operator action)."""

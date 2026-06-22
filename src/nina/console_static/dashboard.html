@@ -412,7 +412,7 @@ async function loadDashboard(data) {
 // ── Usage ─────────────────────────────────────────────────────────────────────
 async function loadUsage() {
   try {
-    const res = await api('/v1/sites/' + S.siteId + '/usage');
+    const res = await api('/v1/auth/sites/' + S.siteId + '/usage');
     if (!res.ok) return;
     const d = res.data;
     const calls = d.calls || 0;
@@ -473,7 +473,7 @@ window.saveLlmConfig = async function() {
   setLoading('llmBtn', true, 'Save AI config');
   clearStatus('llmStatus');
   try {
-    const res = await api('/v1/sites/' + S.siteId + '/llm-config', { llmConfig }, 'PUT');
+    const res = await api('/v1/auth/sites/' + S.siteId + '/llm-config', { llmConfig }, 'PUT');
     if (res.ok) setStatus('llmStatus', 'AI provider saved! NINA is ready to answer questions.', 'ok');
     else setStatus('llmStatus', (res.detail || res.error?.message || 'Save failed.'), 'err');
   } catch(e) {
@@ -512,7 +512,7 @@ window.copyKey = function() {
 // ── Keys ──────────────────────────────────────────────────────────────────────
 async function loadKeys() {
   try {
-    const res = await api('/v1/sites/' + S.siteId + '/keys');
+    const res = await api('/v1/auth/sites/' + S.siteId + '/keys');
     if (!res.ok) return;
     const keys = res.data || [];
     const live = keys.filter(k => !k.revoked && k.kind === 'pk');
@@ -543,7 +543,7 @@ window.revokeKey = async function(keyId, btn) {
   if (!confirm('Revoke this API key? Your widget will stop working immediately.')) return;
   btn.disabled = true; btn.textContent = 'Revoking…';
   try {
-    const res = await api('/v1/keys/' + keyId + '/revoke', {}, 'POST');
+    const res = await api('/v1/auth/keys/' + keyId + '/revoke', {}, 'POST');
     if (res.ok) {
       const row = document.getElementById('keyrow-' + keyId);
       if (row) row.querySelector('.key-actions').innerHTML = '<span style="font-size:.78rem;color:var(--err)">Revoked</span>';
@@ -559,7 +559,7 @@ window.revokeKey = async function(keyId, btn) {
 window.issueNewKey = async function() {
   if (!confirm('Issue a new publishable key? Save it now — it\'s shown once only.')) return;
   try {
-    const res = await api('/v1/keys/issue', { siteId: S.siteId, environment: 'live', kind: 'pk' });
+    const res = await api('/v1/auth/keys/issue', { siteId: S.siteId, environment: 'live', kind: 'pk' });
     if (res.ok) {
       const full = res.data.token;
       S.pubKey = full;
@@ -590,7 +590,7 @@ window.doScan = async function() {
   setLoading('scanBtn', true, 'Auto-scan and configure');
   setStatus('contractStatus', 'Scanning your API — this can take up to 30 seconds…', 'info');
   try {
-    const res = await api('/v1/sites/' + S.siteId + '/generate-from-url', { apiBaseUrl: url });
+    const res = await api('/v1/auth/sites/' + S.siteId + '/generate-from-url', { apiBaseUrl: url });
     if (res.ok) {
       setStatus('contractStatus', 'Contract generated and saved! NINA now knows your store\'s capabilities.', 'ok');
     } else {
@@ -612,7 +612,7 @@ window.uploadContract = async function() {
   setLoading('pasteBtn', true, 'Upload contract');
   clearStatus('contractStatus');
   try {
-    const res = await api('/v1/sites/' + S.siteId + '/contract', { contract }, 'PUT');
+    const res = await api('/v1/auth/sites/' + S.siteId + '/contract', { contract }, 'PUT');
     if (res.ok) setStatus('contractStatus', 'Contract uploaded! NINA now knows your store\'s capabilities.', 'ok');
     else setStatus('contractStatus', res.detail || 'Upload failed.', 'err');
   } catch(e) {
