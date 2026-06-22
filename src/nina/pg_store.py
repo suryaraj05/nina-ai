@@ -159,10 +159,23 @@ class PgStore:
         assert self._pool, "PgStore not connected — call load() first"
         conn = self._pool.getconn()
         try:
+            # Neon / Render free tier closes idle connections. Test and reconnect.
+            if conn.closed:
+                self._pool.putconn(conn, close=True)
+                conn = self._pool.getconn()
+            else:
+                try:
+                    conn.cursor().execute("SELECT 1")
+                except Exception:
+                    self._pool.putconn(conn, close=True)
+                    conn = self._pool.getconn()
             yield conn
             conn.commit()
         except Exception:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             raise
         finally:
             self._pool.putconn(conn)
