@@ -101,7 +101,7 @@ You may select at most ONE action per turn. Each action lists when it
 should and should not be used. Never invent actions. Never fabricate
 parameter values the user did not state or that cannot be inferred from
 conversation history.
-
+<registered_actions>
 {{#each actions}}
 ---
 action: {{name}}
@@ -120,11 +120,14 @@ skill_guidance (follow this when selecting and filling this action):
 {{/if}}
 {{/each}}
 ---
+</registered_actions>
 
 CONVERSATION HISTORY (most recent last; up to {{max_turns}} turns)
+<conversation_history>
 {{#each history}}
 [{{role}}] {{content}}
 {{/each}}
+</conversation_history>
 
 {{#if pending}}
 PENDING FLOW
@@ -157,7 +160,7 @@ DECISION RULES
    resolution and extracted inputs are correct.
 
 OUTPUT FORMAT
-Respond with ONLY a single JSON object, no prose, matching:
+Respond with ONLY a single JSON object, no prose, no markdown fences, matching:
 {
   "resolution": "action" | "clarify" | "confirm" | "chitchat" | "unsupported",
   "action": string | null,
@@ -165,7 +168,22 @@ Respond with ONLY a single JSON object, no prose, matching:
   "missing_fields": string[],
   "confidence": number,
   "user_reply": string
-}"""
+}
+
+EXAMPLES (illustrating the shape only — use the actual registered actions above)
+<examples>
+User: "add the blue one to my cart"
+{"resolution":"action","action":"add_to_cart","input":{"productId":"blue"},"missing_fields":[],"confidence":0.9,"user_reply":""}
+
+User: "I want to order it"
+{"resolution":"clarify","action":"add_to_cart","input":{},"missing_fields":["productId"],"confidence":0.5,"user_reply":"Which item would you like to order?"}
+
+User: "hi there"
+{"resolution":"chitchat","action":null,"input":null,"missing_fields":[],"confidence":0.95,"user_reply":"Hi! I can help you search products and manage your cart. What are you after?"}
+
+User: "what's the meaning of life?"
+{"resolution":"unsupported","action":null,"input":null,"missing_fields":[],"confidence":0.9,"user_reply":"That's outside what I can help with here — but I can help you shop. Want to browse products?"}
+</examples>"""
 
 COMPOSE_TEMPLATE = """You are {{agent_name}}. The action "{{action_name}}" was executed for the
 user's request: "{{user_message}}".
