@@ -19,6 +19,16 @@ from typing import Any
 
 _SEAL_MARKER = "_sealed"
 
+
+def is_production() -> bool:
+    """True when the deployment is explicitly marked production.
+
+    Security-critical config (encryption key, key-hash secret, admin secret)
+    fails closed when this is True, and falls back with a warning otherwise so
+    local development stays frictionless.
+    """
+    return os.environ.get("NINA_ENV", os.environ.get("ENV", "")).strip().lower() == "production"
+
 # ── API key / token hashing (canonical, shared by all stores) ─────────────────
 # Both ConsoleStore (JSON) and PgStore MUST hash identically, or keys issued
 # under one fail to validate under the other. The single algorithm is
@@ -26,9 +36,13 @@ _SEAL_MARKER = "_sealed"
 
 
 def key_hash_secret() -> str:
-    """Resolve the key-hashing secret, warning once if the env var is unset."""
+    """Resolve the key-hashing secret. Fails closed in production if unset."""
     secret = os.environ.get("NINA_CONSOLE_KEY_HASH_SECRET")
     if not secret:
+        if is_production():
+            raise RuntimeError(
+                "NINA_CONSOLE_KEY_HASH_SECRET is required when NINA_ENV=production."
+            )
         warnings.warn(
             "NINA_CONSOLE_KEY_HASH_SECRET is not set — using insecure default. "
             "Set this env var before running in production.",
@@ -64,6 +78,11 @@ def seal_llm_config(config: dict[str, Any]) -> dict[str, Any]:
         return config
     f = _fernet()
     if f is None:
+        if is_production():
+            raise RuntimeError(
+                "NINA_ENCRYPT_KEY is required when NINA_ENV=production "
+                "(refusing to store LLM credentials in plaintext)."
+            )
         warnings.warn(
             "NINA_ENCRYPT_KEY is not set — LLM config stored in plaintext. "
             "Set this env var in production to encrypt API keys at rest.",

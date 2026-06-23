@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from .pool import NinaPool
-from .crypto import hash_key, seal_llm_config, unseal_llm_config
+from .crypto import hash_key, is_production, seal_llm_config, unseal_llm_config
 from .net_guard import SsrfError, validate_public_url
 from .console_pack import (
     build_onboarding_pack_files,
@@ -691,6 +691,15 @@ class OnboardingPackIn(BaseModel):
 
 
 def create_app() -> FastAPI:
+    # Fail closed: in production the admin secret is mandatory. Without it the
+    # /v1/* control plane (create org, issue keys, run scans) would be open to
+    # anonymous callers. Refuse to start rather than boot insecurely.
+    if is_production() and not os.environ.get("NINA_CONSOLE_ADMIN_SECRET"):
+        raise RuntimeError(
+            "NINA_CONSOLE_ADMIN_SECRET is required when NINA_ENV=production "
+            "(refusing to start with an unauthenticated admin API)."
+        )
+
     app = FastAPI(title="NINA Console", version="0.1.0")
 
     # ── Request logging middleware (outermost — captures all requests) ─────────
@@ -725,17 +734,25 @@ def create_app() -> FastAPI:
         if path in ("/health",) or path == "/v1/query" or path.startswith("/v1/auth/") or not path.startswith("/v1/"):
             return await call_next(request)
         secret = os.environ.get("NINA_CONSOLE_ADMIN_SECRET")
-        if secret:
-            auth = request.headers.get("authorization", "")
-            expected = f"Bearer {secret}"
-            if not hmac.compare_digest(
-                auth.encode() if auth else b"",
-                expected.encode(),
-            ):
+        if not secret:
+            # No secret configured. In production this is a hard deny (the boot
+            # check should already have prevented startup); in dev it's a no-op.
+            if is_production():
                 return JSONResponse(
                     status_code=401,
-                    content={"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Console admin secret required. Set Authorization: Bearer <NINA_CONSOLE_ADMIN_SECRET>."}},
+                    content={"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Admin API is not configured."}},
                 )
+            return await call_next(request)
+        auth = request.headers.get("authorization", "")
+        expected = f"Bearer {secret}"
+        if not hmac.compare_digest(
+            auth.encode() if auth else b"",
+            expected.encode(),
+        ):
+            return JSONResponse(
+                status_code=401,
+                content={"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Console admin secret required. Set Authorization: Bearer <NINA_CONSOLE_ADMIN_SECRET>."}},
+            )
         return await call_next(request)
 
     # ── CORS: widget must be callable from any merchant domain ────────────────
