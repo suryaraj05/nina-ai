@@ -15,6 +15,8 @@ import os
 import secrets
 import threading
 import time
+import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -139,6 +141,11 @@ from .plans import PLAN_LIMITS as _PLAN_LIMITS, current_period as _current_perio
 _STORE_WRITE_LOCK = threading.Lock()
 
 # ── Structured JSON logging ──────────────────────────────────────────────────
+# Per-request correlation id, set by the request-id middleware and emitted on
+# every log line so a route log can be matched to its store/LLM operations.
+_request_id_var: ContextVar[str] = ContextVar("nina_request_id", default="")
+
+
 class _JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log: dict[str, Any] = {
@@ -146,6 +153,9 @@ class _JSONFormatter(logging.Formatter):
             "level": record.levelname,
             "msg": record.getMessage(),
         }
+        req_id = _request_id_var.get()
+        if req_id:
+            log["request_id"] = req_id
         for key in ("site_id", "ip", "method", "path", "status", "duration_ms", "error_code", "plan"):
             val = getattr(record, key, None)
             if val is not None:
@@ -705,8 +715,16 @@ def create_app() -> FastAPI:
     # ── Request logging middleware (outermost — captures all requests) ─────────
     @app.middleware("http")
     async def _request_logger(request: Request, call_next):
+        # Honor an inbound request id (e.g. from a gateway), else mint one, so
+        # every log line for this request shares a correlation id.
+        req_id = request.headers.get("X-NINA-Request-Id") or uuid.uuid4().hex
+        token = _request_id_var.set(req_id)
         start = time.time()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        finally:
+            _request_id_var.reset(token)
+        response.headers["X-NINA-Request-Id"] = req_id
         duration_ms = int((time.time() - start) * 1000)
         logger.info(
             "%s %s %d",
