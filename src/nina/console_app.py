@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from .pool import NinaPool
-from .crypto import seal_llm_config, unseal_llm_config
+from .crypto import hash_key, seal_llm_config, unseal_llm_config
 from .console_pack import (
     build_onboarding_pack_files,
     resolve_site_fields,
@@ -67,17 +67,8 @@ def _rand_id(prefix: str) -> str:
 
 
 def _hash_key(raw: str) -> str:
-    secret = os.environ.get("NINA_CONSOLE_KEY_HASH_SECRET")
-    if not secret:
-        import warnings
-        warnings.warn(
-            "NINA_CONSOLE_KEY_HASH_SECRET is not set — using insecure default. "
-            "Set this env var before running in production.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        secret = "nina-console-dev"
-    return hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    # Canonical HMAC-SHA256, shared with PgStore (see crypto.hash_key).
+    return hash_key(raw)
 
 
 def _issue_key(prefix: str) -> tuple[str, str]:
