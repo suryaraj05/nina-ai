@@ -205,6 +205,11 @@ class _HttpProvider:
         timeout = float(os.environ.get("NINA_LLM_TIMEOUT_SECONDS", "20"))
         self._client = httpx.AsyncClient(timeout=timeout)
 
+    async def aclose(self) -> None:
+        """Close the underlying HTTP client, releasing pooled TCP connections."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+
     async def _post(self, url: str, payload: dict, headers: dict) -> dict:
         try:
             resp = await self._client.post(url, json=payload, headers=headers)
@@ -575,6 +580,11 @@ class LLMClient:
 
     async def compose(self, prompt: str):
         return await self.provider.compose(prompt)
+
+    async def aclose(self) -> None:
+        aclose = getattr(self.provider, "aclose", None)
+        if aclose is not None:
+            await aclose()
 
 
 def build_llm_client(llm_cfg: dict) -> LLMClient:

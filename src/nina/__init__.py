@@ -198,6 +198,14 @@ class Nina:
                 "An unexpected internal error occurred during chat.",
             )
 
+    async def aclose(self) -> None:
+        """Release resources (LLM HTTP client). Call when discarding an instance."""
+        llm = getattr(self._core, "llm", None)
+        if llm is not None:
+            aclose = getattr(llm, "aclose", None)
+            if aclose is not None:
+                await aclose()
+
 
 __all__ = [
     "Nina",

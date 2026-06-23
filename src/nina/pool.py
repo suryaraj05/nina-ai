@@ -9,6 +9,14 @@ from typing import Any
 
 _log = logging.getLogger(__name__)
 
+
+async def _safe_aclose(nina: Nina) -> None:
+    """Close a Nina instance's resources, swallowing any teardown error."""
+    try:
+        await nina.aclose()
+    except Exception:  # pragma: no cover - best-effort cleanup
+        pass
+
 from . import Nina
 
 # Max cached Nina instances. LRU sites are evicted when this is exceeded.
@@ -52,8 +60,9 @@ class NinaPool:
                 self._locks[site_id] = asyncio.Lock()
             return self._locks[site_id]
 
-    def _evict_lru(self) -> None:
-        """Evict the least-recently-used site when the pool is over capacity."""
+    async def _evict_lru(self) -> None:
+        """Evict the least-recently-used site when the pool is over capacity,
+        closing its LLM HTTP client so connections aren't leaked."""
         if len(self._instances) <= _MAX_POOL_SIZE:
             return
         # Pick the site with the oldest last_used timestamp
@@ -63,7 +72,19 @@ class NinaPool:
             default=None,
         )
         if lru_site:
+            nina = self._instances.get(lru_site)
             self.evict(lru_site)
+            if nina is not None:
+                await _safe_aclose(nina)
+
+    async def aclose_all(self) -> None:
+        """Close every cached instance's HTTP client. Call on app shutdown."""
+        instances = list(self._instances.values())
+        self._instances.clear()
+        self._locks.clear()
+        self._last_used.clear()
+        for nina in instances:
+            await _safe_aclose(nina)
 
     def _circuit_open(self, site_id: str) -> bool:
         """Return True if the circuit breaker is tripped for this site."""
@@ -115,7 +136,7 @@ class NinaPool:
                 return None
             self._instances[site_id] = nina
             self._last_used[site_id] = time.time()
-            self._evict_lru()
+            await self._evict_lru()
             return nina
 
     def evict(self, site_id: str) -> None:

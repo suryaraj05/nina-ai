@@ -764,6 +764,11 @@ def create_app() -> FastAPI:
         expose_headers=["X-NINA-Request-Id"],
     )
 
+    @app.on_event("shutdown")
+    async def _shutdown() -> None:
+        # Release pooled LLM HTTP clients so connections aren't leaked on reload.
+        await POOL.aclose_all()
+
     @app.get("/health")
     def health() -> dict[str, Any]:
         return {
