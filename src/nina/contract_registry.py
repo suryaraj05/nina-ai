@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from .api_template import build_request_body, resolve_api_url
+from .net_guard import SsrfError, validate_public_url
 
 
 def _parameters_to_input_schema(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -57,13 +58,20 @@ def make_api_handler(contract: dict[str, Any], action: dict[str, Any]) -> Any:
     def handler(inp: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = dict(inp or {})
         url = resolve_api_url(contract, api_ref, params)
+        # SSRF guard: a contract baseUrl or path param must not be used to make
+        # the server fetch internal/metadata endpoints. Redirects are disabled
+        # so a public URL cannot bounce the request to an internal one.
+        try:
+            validate_public_url(url, "API endpoint")
+        except SsrfError as exc:
+            return {"_error": {"code": "API_BLOCKED_URL", "message": str(exc)}}
         body = build_request_body(api_ref, params)
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         session_id = (ctx or {}).get("sessionId")
         if session_id:
             headers["X-NINA-Session-Id"] = session_id
         try:
-            with httpx.Client(timeout=30.0, follow_redirects=True) as http:
+            with httpx.Client(timeout=30.0, follow_redirects=False) as http:
                 resp = http.request(
                     method,
                     url,

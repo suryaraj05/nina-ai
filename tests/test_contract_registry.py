@@ -57,7 +57,10 @@ def test_make_api_handler_success():
     mock_resp.json.return_value = {"results": [{"id": "1"}]}
     mock_resp.raise_for_status = MagicMock()
 
-    with patch("httpx.Client") as client_cls:
+    # This test exercises the HTTP plumbing; bypass the SSRF guard so the
+    # loopback fixture URL is permitted (the guard is covered separately below).
+    with patch("nina.contract_registry.validate_public_url", return_value=None), \
+            patch("httpx.Client") as client_cls:
         client = client_cls.return_value.__enter__.return_value
         client.request.return_value = mock_resp
         out = handler({"query": "hoodie"}, {"sessionId": "s1"})
@@ -67,6 +70,16 @@ def test_make_api_handler_success():
     call = client.request.call_args
     assert call[0][0] == "POST"
     assert call[1]["json"] == {"query": "hoodie"}
+
+
+def test_make_api_handler_blocks_internal_url():
+    """SSRF guard: a contract pointing at an internal host must not be fetched."""
+    handler = make_api_handler(SAMPLE_CONTRACT, SAMPLE_CONTRACT["actions"][0])
+    with patch("httpx.Client") as client_cls:
+        out = handler({"query": "hoodie"}, {"sessionId": "s1"})
+    # Loopback baseUrl (127.0.0.1) is rejected before any request is made.
+    assert out["_error"]["code"] == "API_BLOCKED_URL"
+    client_cls.assert_not_called()
 
 
 @pytest.mark.asyncio

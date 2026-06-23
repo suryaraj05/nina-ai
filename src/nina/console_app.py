@@ -10,7 +10,6 @@ import argparse
 import collections
 import hashlib
 import hmac
-import ipaddress
 import json
 import os
 import secrets
@@ -33,6 +32,7 @@ import logging
 
 from .pool import NinaPool
 from .crypto import hash_key, seal_llm_config, unseal_llm_config
+from .net_guard import SsrfError, validate_public_url
 from .console_pack import (
     build_onboarding_pack_files,
     resolve_site_fields,
@@ -77,39 +77,16 @@ def _issue_key(prefix: str) -> tuple[str, str]:
 
 
 # ── SSRF guard ───────────────────────────────────────────────────────────────
-_BLOCKED_NETS = [
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),  # link-local / AWS metadata
-    ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-]
-
-
 def _validate_external_url(url: str, label: str = "URL") -> None:
-    """Raise HTTPException 400 if the URL targets private/loopback addresses."""
+    """Raise HTTPException 400 if the URL targets private/loopback addresses.
+
+    Delegates to the shared SSRF guard (which resolves DNS and checks every
+    resolved address), translating its error into the API's HTTP envelope.
+    """
     try:
-        parsed = urlparse(url)
-    except Exception:
-        raise HTTPException(status_code=400, detail=f"Invalid {label}.")
-    if parsed.scheme not in ("http", "https"):
-        raise HTTPException(status_code=400, detail=f"{label} must use http or https.")
-    host = (parsed.hostname or "").lower().rstrip(".")
-    if not host:
-        raise HTTPException(status_code=400, detail=f"{label} must have a hostname.")
-    if host == "localhost":
-        raise HTTPException(status_code=400, detail=f"Internal {label.lower()} is not allowed.")
-    try:
-        addr = ipaddress.ip_address(host)
-        for net in _BLOCKED_NETS:
-            if addr in net:
-                raise HTTPException(status_code=400, detail=f"Internal {label.lower()} is not allowed.")
-    except ValueError:
-        pass  # hostname, not a bare IP literal — DNS resolution still poses risk,
-              # but blocking IP literals is the critical fix for cloud metadata attacks.
+        validate_public_url(url, label)
+    except SsrfError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ── Safe local path resolver ─────────────────────────────────────────────────
