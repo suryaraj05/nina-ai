@@ -444,6 +444,18 @@ async function loadDashboard(data) {
     document.getElementById('llmApiKey').placeholder = 'Leave blank to keep existing key';
   }
 
+  // Show "contract already attached" indicator with the action count.
+  const contract = S.site.agentContract;
+  const actionCount = contract && Array.isArray(contract.actions) ? contract.actions.length : 0;
+  if (contract && actionCount > 0) {
+    setStatus('contractStatus',
+      'Contract attached — NINA knows ' + actionCount + ' action' + (actionCount === 1 ? '' : 's') +
+      ' for your store. Upload a new file only to replace it.', 'ok');
+  } else if (contract) {
+    setStatus('contractStatus',
+      'A contract is attached but has no actions. Re-upload your nina-manifest.json.', 'warn');
+  }
+
   // Restore publishable key from sessionStorage (it's a public key — safe to cache)
   const cachedKey = sessionStorage.getItem('nina_pub_key_' + S.siteId);
   if (cachedKey) S.pubKey = cachedKey;
