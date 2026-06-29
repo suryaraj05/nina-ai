@@ -41,7 +41,11 @@ def _wait_for_server(base_url: str, timeout_s: float = 30.0) -> None:
 def demo_server():
     """Start a dedicated uvicorn instance on a free port for E2E."""
     port = _free_port()
-    env = {**os.environ, "NINA_DEBUG": "0"}
+    # The whole e2e module shares this one server (module-scoped). Several tests
+    # legitimately POST many requests, which would trip the default 60/min IP
+    # limiter and make a later test see a spurious 429. Raise the limit for the
+    # test server only — production defaults are unchanged.
+    env = {**os.environ, "NINA_DEBUG": "0", "NINA_RATE_LIMIT": "100000"}
     proc = subprocess.Popen(
         [
             sys.executable,

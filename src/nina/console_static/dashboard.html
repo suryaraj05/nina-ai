@@ -250,8 +250,24 @@
     <!-- ── Contract ── -->
     <div class="card full">
       <h3><span class="section-icon icon-orange">📋</span> Agent contract</h3>
-      <p class="card-sub">NINA needs to know your store's API routes. Run the <code style="background:#f0f3fb;padding:1px 6px;border-radius:4px;">nina-scan</code> CLI on your source code, then upload the generated file here.</p>
+      <p class="card-sub">NINA needs to know your store's API routes. The fastest way is to paste your API's OpenAPI/Swagger URL — NINA reads the real routes and builds the actions for you.</p>
       <div id="contractStatus" class="status"></div>
+
+      <!-- Recommended: generate from a live OpenAPI/Swagger URL -->
+      <div style="background:var(--blue-light, #eef3ff);border:1px solid var(--blue, #3b6cff);border-radius:10px;padding:18px;margin-bottom:18px;">
+        <p style="font-size:.82rem;font-weight:700;margin-bottom:6px;color:var(--text);">✨ Recommended — generate from your API URL</p>
+        <p style="font-size:.76rem;color:var(--muted);margin-bottom:10px;">Paste your OpenAPI/Swagger document URL (e.g. <code style="background:#f0f3fb;padding:1px 5px;border-radius:4px;">https://api.yourstore.com/openapi.json</code> or a NestJS <code style="background:#f0f3fb;padding:1px 5px;border-radius:4px;">/api/docs-json</code>). NINA reads the real paths, methods, and parameters — no guessing, no CLI.</p>
+        <input type="text" id="openapiUrl" placeholder="https://api.yourstore.com/openapi.json" style="margin-bottom:10px;">
+        <label style="font-size:.76rem;font-weight:600;color:var(--text);display:block;margin-bottom:4px;">Where should actions run?</label>
+        <select id="openapiRuntime" style="margin-bottom:6px;">
+          <option value="browser">Browser — the visitor's browser calls your API (works on localhost; data never transits NINA)</option>
+          <option value="server">Server — NINA's backend calls your API (must be a public URL NINA can reach)</option>
+        </select>
+        <p style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Write actions (add to cart, checkout, etc.) are gated for confirmation by default. Review and prune them after generating.</p>
+        <button class="btn btn-primary btn-full" id="openapiBtn" onclick="generateFromUrl()">Read my API and build actions</button>
+      </div>
+
+      <div class="divider"><span>or scan your source with the CLI</span></div>
 
       <!-- Step 1: install + run CLI -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px;">
@@ -725,6 +741,32 @@ window.uploadContract = async function() {
     setStatus('contractStatus', e.message, 'err');
   } finally {
     setLoading('pasteBtn', false, 'Upload contract');
+  }
+};
+
+window.generateFromUrl = async function() {
+  const url = document.getElementById('openapiUrl').value.trim();
+  const runtime = document.getElementById('openapiRuntime').value;
+  if (!url) { setStatus('contractStatus', 'Paste your OpenAPI/Swagger URL first.', 'err'); return; }
+  setLoading('openapiBtn', true, 'Read my API and build actions');
+  clearStatus('contractStatus');
+  try {
+    const res = await api('/v1/auth/sites/' + S.siteId + '/generate-from-url',
+      { apiBaseUrl: url, runtime });
+    if (res.ok) {
+      const d = res.data || {};
+      setStatus('contractStatus',
+        'Built ' + d.actionsFound + ' action' + (d.actionsFound === 1 ? '' : 's') +
+        ' from your API (' + d.runtime + ' runtime, base ' + d.baseUrl + '). ' +
+        'Reload to review them.', 'ok');
+    } else {
+      const why = (res.errors && res.errors.join('; ')) || res.detail || 'Could not read that API.';
+      setStatus('contractStatus', why, 'err');
+    }
+  } catch(e) {
+    setStatus('contractStatus', 'Network error: ' + e.message, 'err');
+  } finally {
+    setLoading('openapiBtn', false, 'Read my API and build actions');
   }
 };
 

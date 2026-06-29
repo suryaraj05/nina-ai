@@ -188,6 +188,181 @@ def build_manifest_from_openapi(
     }
 
 
+# ---------------------------------------------------------------------------
+# OpenAPI -> agent contract (the runtime shape the engine actually executes)
+#
+# build_manifest_from_openapi (above) drafts the human-facing api.manifest.yaml.
+# The functions below produce the *contract* shape consumed by the engine at
+# runtime: a list of actions, each with an `execute.apiRef` block, plus an
+# `apis.default.baseUrl` so resolve_api_url can build the full URL. This is the
+# "routes -> actions" step that /v1/auth/sites/{id}/generate-from-url needs.
+# ---------------------------------------------------------------------------
+
+_CONTRACT_PARAM_TYPES = {"string", "number", "boolean", "integer"}
+_SPEC_URL_HINTS = ("openapi", "swagger", "docs-json", "api-json", ".json")
+
+
+def _contract_param_type(schema: dict[str, Any]) -> str:
+    """Contract params only allow scalar JSON types; widen array/object to string."""
+    t = _schema_type(schema)
+    return t if t in _CONTRACT_PARAM_TYPES else "string"
+
+
+def _contract_param_spec(name: str, schema: dict[str, Any], description: str, required: bool) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "type": _contract_param_type(schema),
+        "required": required,
+        "description": (description or f"{name} parameter").strip()[:200],
+    }
+    if schema.get("enum"):
+        out["enum"] = schema["enum"]
+    return out
+
+
+def _contract_body_params(spec: dict[str, Any], operation: dict[str, Any]) -> dict[str, Any]:
+    body = operation.get("requestBody") or {}
+    content = (body.get("content") or {}).get("application/json") or {}
+    schema = content.get("schema") or {}
+    if "$ref" in schema:
+        schema = _resolve_ref(spec, schema["$ref"])
+    props = schema.get("properties") or {}
+    required_names = set(schema.get("required") or [])
+    out: dict[str, Any] = {}
+    for prop_name, prop_schema in props.items():
+        if "$ref" in prop_schema:
+            prop_schema = _resolve_ref(spec, prop_schema["$ref"])
+        out[prop_name] = _contract_param_spec(
+            prop_name, prop_schema, prop_schema.get("description", ""), prop_name in required_names
+        )
+    return out
+
+
+def _ensure_min_description(text: str, action_id: str) -> str:
+    """agent.schema.json requires description minLength 3."""
+    text = (text or "").strip()
+    if len(text) < 3:
+        text = f"{action_id.replace('_', ' ')} endpoint"
+    return text[:200]
+
+
+def spec_to_actions(
+    spec: dict[str, Any], *, methods: set[str] | None = None, runtime: str = "server"
+) -> list[dict[str, Any]]:
+    """Convert an OpenAPI document into a list of contract actions.
+
+    Each action carries an `execute.apiRef` (method/path/bodyTemplate). Paths
+    keep their `{placeholder}` params so resolve_api_url substitutes them;
+    query/body params become a bodyTemplate that build_request_body turns into
+    the query string (GET) or JSON body.
+
+    `runtime` controls who calls the API:
+    - "server": NINA's backend calls it (SSRF-guarded; the result is read back
+      server-side). Cannot reach a store on localhost/a private network.
+    - "browser": the engine emits an `api_call` instruction the widget runs in
+      the visitor's browser — required when the store runs on localhost or when
+      customer data must not transit NINA's servers.
+    """
+    if runtime not in ("server", "browser"):
+        raise ValueError("runtime must be 'server' or 'browser'")
+    methods = methods or {"get", "post", "put", "patch", "delete"}
+    actions: list[dict[str, Any]] = []
+    used_names: set[str] = set()
+
+    for path, path_item in (spec.get("paths") or {}).items():
+        if not isinstance(path_item, dict):
+            continue
+        path_level_params = path_item.get("parameters") or []
+        for method, operation in path_item.items():
+            if method.lower() not in methods or not isinstance(operation, dict):
+                continue
+            action_id = _action_id_for(method, path, operation.get("operationId"), used_names)
+
+            parameters: dict[str, Any] = {}
+            query_names: list[str] = []
+            for raw_param in [*path_level_params, *(operation.get("parameters") or [])]:
+                if "$ref" in raw_param:
+                    raw_param = _resolve_ref(spec, raw_param["$ref"])
+                loc = raw_param.get("in")
+                if loc not in ("path", "query"):
+                    continue
+                p_name = raw_param.get("name")
+                if not p_name:
+                    continue
+                parameters[p_name] = _contract_param_spec(
+                    p_name, raw_param.get("schema") or {}, raw_param.get("description", ""), bool(raw_param.get("required"))
+                )
+                if loc == "query":
+                    query_names.append(p_name)
+
+            body_params = _contract_body_params(spec, operation)
+            parameters.update(body_params)
+
+            api_ref: dict[str, Any] = {"method": method.upper(), "path": path}
+            # Path params live in the URL placeholder; query+body params travel
+            # via a bodyTemplate (query string for GET, JSON body otherwise).
+            template_names = list(body_params) if body_params else query_names
+            if template_names:
+                api_ref["bodyTemplate"] = {name: f"{{{name}}}" for name in template_names}
+
+            is_write = method.lower() in ("post", "put", "patch", "delete")
+            description = _ensure_min_description(
+                operation.get("summary") or operation.get("description") or f"{method.upper()} {path}",
+                action_id,
+            )
+            actions.append({
+                "id": action_id,
+                "description": description,
+                "parameters": parameters,
+                "risk": "high" if is_write else "low",
+                "requiresAuth": bool(operation.get("security")),
+                "execute": {"type": "api", "runtime": runtime, "apiRef": api_ref},
+            })
+
+    return actions
+
+
+def resolve_base_url(spec: dict[str, Any], base_url: str | None = None) -> str:
+    """Pick the API base URL: explicit override, else the spec's first server."""
+    if base_url:
+        return base_url.rstrip("/")
+    servers = spec.get("servers") or []
+    if servers and servers[0].get("url"):
+        return servers[0]["url"].rstrip("/")
+    return ""
+
+
+def build_contract_from_openapi(
+    spec: dict[str, Any], *, base_url: str | None = None, runtime: str = "server"
+) -> dict[str, Any]:
+    """Build a partial agent contract (apis + actions + risk) from an OpenAPI doc.
+
+    Write actions (POST/PUT/PATCH/DELETE) are marked high-risk and land in
+    risk.confirmActions so money/mutation actions are gated by default — the
+    merchant can prune them in the dashboard before going live. See
+    spec_to_actions for the meaning of `runtime`.
+    """
+    actions = spec_to_actions(spec, runtime=runtime)
+    base = resolve_base_url(spec, base_url)
+    confirm = [a["id"] for a in actions if a.get("risk") == "high"]
+    return {
+        "apis": {"default": {"baseUrl": base, "description": (spec.get("info") or {}).get("title", "API")}},
+        "actions": actions,
+        "risk": {"confirmActions": confirm, "blockActions": []},
+    }
+
+
+def spec_url_for(api_base_url: str) -> str:
+    """Resolve a likely OpenAPI document URL from a user-pasted API URL.
+
+    If the URL already looks like a spec document (…/openapi.json, swagger,
+    NestJS' /api/docs-json, etc.) use it as-is; otherwise append /openapi.json.
+    """
+    url = (api_base_url or "").strip()
+    if any(hint in url.lower() for hint in _SPEC_URL_HINTS):
+        return url
+    return url.rstrip("/") + "/openapi.json"
+
+
 def probe_to_yaml(spec_url: str, output_path: Path, *, base_url: str | None = None) -> dict[str, Any]:
     spec = fetch_openapi_spec(spec_url)
     manifest = build_manifest_from_openapi(spec, base_url=base_url)

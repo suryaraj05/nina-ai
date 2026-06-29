@@ -170,6 +170,128 @@ def test_pool_evicted_on_llm_config_change(client_and_site):
     assert site_id not in POOL._instances
 
 
+_API_CONTRACT = {
+    "site": {"id": "acme", "name": "Acme", "baseUrl": "https://shop.acme.test"},
+    "apis": {"default": {"baseUrl": "https://shop.acme.test"}},
+    "actions": [
+        {
+            "id": "search_products",
+            "description": "Search the product catalog by keyword",
+            "parameters": {"query": {"type": "string", "required": True}},
+            "risk": "low",
+            "requiresAuth": False,
+            "execute": {
+                "type": "api",
+                "runtime": "server",
+                "apiRef": {"method": "GET", "path": "/search", "bodyTemplate": {"query": "{query}"}},
+            },
+        }
+    ],
+    "risk": {},
+}
+
+
+def test_pool_registers_contract_actions(client_and_site):
+    """A query against a site with an API contract must make the contract's
+    actions visible to the engine — the pool builds a bare Nina(), so without
+    explicit registration the engine would see zero actions (chitchat only)."""
+    client, site_id, raw_key = client_and_site
+    STORE.attach_contract(site_id, _API_CONTRACT)
+    _inject_llm(site_id)
+
+    res = client.post(
+        "/v1/query",
+        json={"message": "hi", "sessionId": "ses-reg"},
+        headers={"X-NINA-API-Key": raw_key, "Origin": "https://shop.acme.test"},
+    )
+    assert res.json()["ok"] is True
+    nina = POOL._instances[site_id]
+    registered = {a["name"] for a in nina._core.registry.all()}
+    assert "search_products" in registered
+
+
+def test_generate_from_url_builds_browser_contract(client_and_site):
+    """The dashboard 'paste your API URL' flow: fetch a live OpenAPI doc and
+    attach a generated, browser-runtime contract the engine can execute."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    client, site_id, _ = client_and_site
+
+    spec = {
+        "openapi": "3.0.0",
+        "info": {"title": "Demo Shop"},
+        "paths": {
+            "/search": {
+                "get": {
+                    "operationId": "search_products",
+                    "summary": "Search the product catalog by keyword",
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}
+                    ],
+                }
+            }
+        },
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(spec).encode())
+
+    srv = HTTPServer(("127.0.0.1", 0), Handler)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        # Need a dashboard token for the /v1/auth/* route — make a fresh org/site.
+        org = client.post("/v1/orgs", json={"name": "Gen"}).json()["data"]
+        site = client.post("/v1/sites", json={
+            "orgId": org["id"], "name": "Gen Store",
+            "baseUrl": "https://gen.test", "allowedOrigins": ["https://gen.test"],
+        }).json()["data"]
+        headers = {"Authorization": "Bearer " + org["dashboardToken"]}
+
+        res = client.post(
+            f"/v1/auth/sites/{site['id']}/generate-from-url",
+            json={"apiBaseUrl": f"http://127.0.0.1:{port}/openapi.json", "runtime": "browser"},
+            headers=headers,
+        )
+    finally:
+        srv.shutdown()
+
+    body = res.json()
+    assert body["ok"] is True, body
+    assert body["data"]["actionsFound"] == 1
+    assert body["data"]["runtime"] == "browser"
+
+    contract = STORE.sites[site["id"]]["agentContract"]
+    action = contract["actions"][0]
+    assert action["id"] == "search_products"
+    assert action["execute"]["runtime"] == "browser"
+    assert action["execute"]["apiRef"]["path"] == "/search"
+
+
+def test_generate_from_url_rejects_bad_runtime(client_and_site):
+    client, _, _ = client_and_site
+    org = client.post("/v1/orgs", json={"name": "Gen2"}).json()["data"]
+    site = client.post("/v1/sites", json={
+        "orgId": org["id"], "name": "Gen2 Store",
+        "baseUrl": "https://gen2.test", "allowedOrigins": ["https://gen2.test"],
+    }).json()["data"]
+    res = client.post(
+        f"/v1/auth/sites/{site['id']}/generate-from-url",
+        json={"apiBaseUrl": "http://x.test/openapi.json", "runtime": "cloud"},
+        headers={"Authorization": "Bearer " + org["dashboardToken"]},
+    )
+    assert res.status_code == 400
+
+
 def test_same_site_multiple_sessions_isolated(client_and_site):
     """Two sessionIds on the same site should produce independent turn responses."""
     client, site_id, raw_key = client_and_site

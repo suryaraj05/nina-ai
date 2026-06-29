@@ -145,6 +145,25 @@ class NinaPool:
         self._locks.pop(site_id, None)
         self._last_used.pop(site_id, None)
 
+    async def _ensure_contract_registered(self, nina: Nina, contract: dict[str, Any] | None) -> None:
+        """Register the contract's actions onto this instance, once per instance.
+
+        Must be called under the per-site lock. Idempotent via a flag on the
+        core; the flag resets naturally because a new contract evicts (rebuilds)
+        the instance.
+        """
+        core = nina._core
+        if getattr(core, "_contract_registered", False):
+            return
+        from .contract_registry import register_from_contract
+        try:
+            result = await register_from_contract(nina, contract or {})
+            if result.get("failed"):
+                _log.warning("contract action registration: %d failed", len(result["failed"]))
+        except Exception:
+            _log.exception("contract action registration failed")
+        core._contract_registered = True
+
     async def run(
         self,
         site_id: str,
@@ -188,6 +207,12 @@ class NinaPool:
                 "_sessionHints": session_hints or {},
                 "_pageId": page_id,
             }
+            # Make the contract's actions resolvable/executable. The pool builds
+            # a bare Nina() (init only), so without this the engine sees zero
+            # registered actions and can only chitchat. Register once per cached
+            # instance — every contract change calls POOL.evict(), which discards
+            # the instance and forces a fresh registration on next use.
+            await self._ensure_contract_registered(nina, contract)
             result = await nina.chat(
                 message,
                 session_id,
