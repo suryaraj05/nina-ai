@@ -8,7 +8,7 @@ again unnoticed.
 
 from __future__ import annotations
 
-from nina.console_app import ConsoleStore
+from nina.console_store import ConsoleStore
 from nina.pg_store import PgStore
 from nina.store import STORE_METHODS, Store
 

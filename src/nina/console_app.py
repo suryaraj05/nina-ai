@@ -26,9 +26,13 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .pool import NinaPool
-from .store import Store
-from .console_store import ConsoleStore
+from .console_deps import (
+    POOL,
+    STORE,
+    _db_url,
+    _require_dashboard_token,
+    _require_site_ownership,
+)
 from .console_schemas import (
     CliTokenIn,
     KeyIssueIn,
@@ -73,18 +77,6 @@ _issue_key = issue_key
 
 
 from .plans import PLAN_LIMITS as _PLAN_LIMITS, current_period as _current_period, VALID_PLANS as _VALID_PLANS
-
-
-_db_url = os.environ.get("DATABASE_URL", "")
-if _db_url:
-    from .pg_store import PgStore
-    STORE: Store = PgStore()
-    STORE.load()
-else:
-    STORE = ConsoleStore()
-    STORE.load(Path(os.environ.get("NINA_CONSOLE_STORE_PATH", "nina_console_store.json")))
-
-POOL = NinaPool()
 
 
 def create_app() -> FastAPI:
@@ -371,25 +363,6 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=401, detail="Invalid or expired dashboard token.")
         sites = STORE.list_sites(org_id=org["id"])
         return {"ok": True, "data": {"org": {k: v for k, v in org.items() if k != "dashboardTokenDigest"}, "sites": sites}}
-
-    def _require_dashboard_token(authorization: str | None) -> dict[str, Any]:
-        """Validate dashboard token and return org. Raises 401 on failure."""
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Dashboard token required.")
-        raw = authorization.removeprefix("Bearer ").strip()
-        org = STORE.verify_dashboard_token(raw)
-        if not org:
-            raise HTTPException(status_code=401, detail="Invalid or expired dashboard token.")
-        return org
-
-    def _require_site_ownership(org: dict[str, Any], site_id: str) -> dict[str, Any]:
-        """Confirm org owns site_id. Raises 403 if not."""
-        site = STORE.get_site(site_id)
-        if not site:
-            raise HTTPException(status_code=404, detail="Site not found.")
-        if site.get("orgId") != org["id"]:
-            raise HTTPException(status_code=403, detail="Access denied.")
-        return site
 
     @app.get("/v1/auth/sites/{site_id}/usage")
     def merchant_get_usage(site_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
