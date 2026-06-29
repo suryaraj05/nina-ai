@@ -77,6 +77,100 @@ def _extract_list(result):
     return None
 
 
+# --- Product cards: map an action result into shopper-facing cards -----------
+# Heuristic mapping that covers common commerce JSON (Shopify products.json,
+# generic search APIs). The widget renders whatever fields are present.
+
+_PRICE_KEYS = ("price", "amount", "cost", "salePrice", "sale_price", "minPrice", "min_price")
+_IMAGE_KEYS = ("image", "imageUrl", "image_url", "img", "thumbnail", "thumb",
+               "photo", "featuredImage", "featured_image")
+_URL_KEYS = ("url", "link", "href", "productUrl", "product_url", "permalink")
+_CURRENCY_KEYS = ("currency", "currencyCode", "currency_code")
+# Action names for which result items are NOT browsable products (cart/checkout
+# mutations, auth) — showing cards there would be wrong.
+_NON_PRODUCT_ACTION_HINTS = ("add", "cart", "checkout", "remove", "buy", "order", "pay", "login", "logout")
+
+
+def _first(item, keys):
+    for k in keys:
+        v = item.get(k)
+        if v not in (None, ""):
+            return v
+    return None
+
+
+def _image_of(item):
+    v = _first(item, _IMAGE_KEYS)
+    if isinstance(v, str):
+        return v
+    if isinstance(v, dict):                       # e.g. Shopify image object
+        return v.get("src") or v.get("url")
+    imgs = item.get("images")
+    if isinstance(imgs, list) and imgs:
+        first = imgs[0]
+        if isinstance(first, str):
+            return first
+        if isinstance(first, dict):
+            return first.get("src") or first.get("url")
+    return None
+
+
+def _price_of(item):
+    v = _first(item, _PRICE_KEYS)
+    if isinstance(v, dict):                        # {amount, currencyCode}
+        v = v.get("amount") or v.get("value")
+    if isinstance(v, (int, float, str)):
+        return v
+    variants = item.get("variants")               # Shopify: variants[0].price
+    if isinstance(variants, list) and variants and isinstance(variants[0], dict):
+        return variants[0].get("price")
+    return None
+
+
+def products_from_result(result, action_name="", *, limit=8, base_url=None):
+    """Map an action result into a list of product cards for the widget.
+
+    Returns [] for cart/checkout/auth actions and for results that don't look
+    like a product listing, so it's safe to call on every action turn.
+    """
+    if action_name and any(w in action_name.lower() for w in _NON_PRODUCT_ACTION_HINTS):
+        return []
+    listing = _extract_list(result)
+    if listing is None:
+        if isinstance(result, dict) and any(k in result for k in _ITEM_ID_KEYS + _ITEM_NAME_KEYS):
+            listing = [result]
+        else:
+            return []
+
+    products = []
+    for item in listing[:limit]:
+        if not isinstance(item, dict):
+            continue
+        title = _first(item, _ITEM_NAME_KEYS)
+        if not title:
+            continue  # a card without a name is useless
+        card = {"title": str(title)}
+        pid = _first(item, _ITEM_ID_KEYS)
+        if pid is not None:
+            card["id"] = pid
+        price = _price_of(item)
+        if price is not None and price != "":
+            card["price"] = price
+        currency = _first(item, _CURRENCY_KEYS)
+        if currency:
+            card["currency"] = currency
+        image = _image_of(item)
+        if image:
+            card["image"] = image
+        url = _first(item, _URL_KEYS)
+        if not url and base_url and item.get("handle"):   # Shopify handle -> URL
+            url = base_url.rstrip("/") + "/products/" + str(item["handle"])
+        if url:
+            card["url"] = url
+        products.append(card)
+    return products
+
+
 def update_reference_map(state, action_name, result):
     """Refresh the reference map after a successful action turn."""
     rm = state.setdefault("referenceMap", _empty_reference_map())

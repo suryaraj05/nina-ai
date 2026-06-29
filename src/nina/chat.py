@@ -32,7 +32,7 @@ from .planner import (
 )
 from .reasoner import maybe_reason
 from .responder import compose_chitchat, compose_response
-from .session import resolve_reference_parameters, update_reference_map
+from .session import products_from_result, resolve_reference_parameters, update_reference_map
 
 
 def _shape(value):
@@ -195,6 +195,7 @@ async def _build_turn(
     action_result=None,
     action_error=None,
     clarification_needed=None,
+    products=None,
     reasoning_used=False,
     reasoning_summary=None,
     usage_parts=(),
@@ -218,6 +219,8 @@ async def _build_turn(
         "reasoningSummary": reasoning_summary,
         "usage": usage,
     }
+    if products:
+        turn["products"] = products
     await _record_turn(state, turn_id, user_message, turn)
     await core.sessions.save(state)
     return turn
@@ -391,6 +394,15 @@ async def _execute_action_turn(
     )
     usage_parts.append(compose_usage)
 
+    # Surface browsable results (search/recommendation) as product cards for the
+    # widget. Empty for cart/checkout/auth actions or non-listing results.
+    products = []
+    if not action_error:
+        contract = (core.config or {}).get("_agentContract") or {}
+        apis = contract.get("apis") or {}
+        base_url = (apis.get("default") or {}).get("baseUrl") or (contract.get("site") or {}).get("baseUrl")
+        products = products_from_result(result, action_name, base_url=base_url)
+
     turn = await _build_turn(
         core,
         state,
@@ -404,6 +416,7 @@ async def _execute_action_turn(
         action_input=action_input,
         action_result=result if not action_error else None,
         action_error=action_error,
+        products=products,
         reasoning_used=reasoning_used,
         reasoning_summary=reasoning_summary,
         usage_parts=usage_parts,
