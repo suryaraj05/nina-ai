@@ -555,54 +555,13 @@ async def _apply_contract_safety_gate(
     return None
 
 
-async def run_turn(
-    core,
-    user_message: str,
-    session_id: str,
-    *,
-    replay_queued: bool = False,
-    resume_plan: bool = False,
-) -> dict:
-    """Execute one chat turn. Returns the universal envelope."""
-    if not core.initialized:
-        return fail("NINA_NOT_INITIALIZED", "Call nina.init() first.")
-
-    if replay_queued and not (user_message or "").strip():
-        user_message = "(replay queued action)"
-    if resume_plan and not (user_message or "").strip():
-        user_message = "(resuming plan)"
-
-    err, msg = _validate_inputs(user_message, session_id)
-    if err:
-        return err
-
-    started = time.perf_counter()
-    try:
-        state = await core.sessions.load_or_create(session_id)
-    except StoreError as exc:
-        return fail(
-            "NINA_SESSION_STORE_FAILURE",
-            f"Session store operation '{exc.op}' failed.",
-            {"reason": exc.reason},
-        )
-
-    security = ((core.config or {}).get("security")) or {}
-    threshold_for_gate = core.behavior.get("confidenceThreshold", 0.75)
-    pre_block = run_pre_llm_checks(msg, security)
-    if pre_block:
-        turn = await _build_guardrail_turn(
-            core, state, session_id, msg, started, pre_block
-        )
-        return ok(turn)
-
-    if security.get("enableSemanticInjectionGuard", True):
-        semantic_block = await detect_injection_semantic(core.llm, msg)
-        if semantic_block:
-            turn = await _build_guardrail_turn(
-                core, state, session_id, msg, started, semantic_block
-            )
-            return ok(turn)
-
+async def _handle_pending_continuations(
+    core, state, session_id, msg, started, *,
+    threshold_for_gate, security, replay_queued, resume_plan,
+) -> dict | None:
+    """Run any pending continuation before normal resolution: an auto-action
+    step, an auth-gated replay, or a resumed plan. Returns a turn envelope if
+    one fired, else None to fall through to normal resolution."""
     auto_step = pending_auto_action(state)
     if auto_step and auto_step.get("action"):
         gated = await _apply_contract_safety_gate(
@@ -710,7 +669,64 @@ async def run_turn(
             ),
         )
         return ok(turn)
+    return None
 
+
+async def run_turn(
+    core,
+    user_message: str,
+    session_id: str,
+    *,
+    replay_queued: bool = False,
+    resume_plan: bool = False,
+) -> dict:
+    """Execute one chat turn. Returns the universal envelope."""
+    if not core.initialized:
+        return fail("NINA_NOT_INITIALIZED", "Call nina.init() first.")
+
+    if replay_queued and not (user_message or "").strip():
+        user_message = "(replay queued action)"
+    if resume_plan and not (user_message or "").strip():
+        user_message = "(resuming plan)"
+
+    err, msg = _validate_inputs(user_message, session_id)
+    if err:
+        return err
+
+    started = time.perf_counter()
+    try:
+        state = await core.sessions.load_or_create(session_id)
+    except StoreError as exc:
+        return fail(
+            "NINA_SESSION_STORE_FAILURE",
+            f"Session store operation '{exc.op}' failed.",
+            {"reason": exc.reason},
+        )
+
+    security = ((core.config or {}).get("security")) or {}
+    threshold_for_gate = core.behavior.get("confidenceThreshold", 0.75)
+    pre_block = run_pre_llm_checks(msg, security)
+    if pre_block:
+        turn = await _build_guardrail_turn(
+            core, state, session_id, msg, started, pre_block
+        )
+        return ok(turn)
+
+    if security.get("enableSemanticInjectionGuard", True):
+        semantic_block = await detect_injection_semantic(core.llm, msg)
+        if semantic_block:
+            turn = await _build_guardrail_turn(
+                core, state, session_id, msg, started, semantic_block
+            )
+            return ok(turn)
+
+    cont = await _handle_pending_continuations(
+        core, state, session_id, msg, started,
+        threshold_for_gate=threshold_for_gate, security=security,
+        replay_queued=replay_queued, resume_plan=resume_plan,
+    )
+    if cont is not None:
+        return cont
     actions = core.registry.all()
     if not actions and not core.behavior.get("allowChitchat", True):
         return fail(
