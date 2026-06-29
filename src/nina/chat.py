@@ -672,6 +672,96 @@ async def _handle_pending_continuations(
     return None
 
 
+async def _handle_clarification(
+    core, state, session_id, msg, started, *,
+    res, resolution, action_name, action_input, confidence, threshold,
+    pending, reasoning_used, reasoning_summary, usage_parts,
+) -> dict | None:
+    """If the resolution is ambiguous (explicit clarify, low confidence, or
+    missing required fields), ask a clarifying question — or give up after
+    maxClarifications. Returns a turn envelope if handled, else None."""
+    missing = res.get("missing_fields") or []
+    needs_clarify = (
+        resolution == "clarify"
+        or confidence < threshold
+        or (resolution == "action" and missing)
+    )
+
+    if needs_clarify and resolution != "confirm":
+        question = res.get("user_reply") or ""
+        strategy = "missing_field"
+        if not question.strip():
+            question, strategy = await generate_clarification(
+                core.llm,
+                core.identity,
+                core.behavior,
+                state,
+                msg,
+                action_name or (pending or {}).get("action") or "unknown",
+                (pending or {}).get("collectedInput") or action_input,
+                missing,
+                confidence,
+                question,
+            )
+        attempts = ((pending or {}).get("attemptsUsed") or 0) + 1
+        max_clar = core.behavior.get("maxClarifications", 2)
+        if attempts > max_clar:
+            turn = await _build_turn(
+                core,
+                state,
+                session_id,
+                msg,
+                started,
+                intent="unsupported",
+                confidence=confidence,
+                natural_language_response=(
+                    "I'm still not sure what you need. "
+                    "Could you rephrase or be more specific?"
+                ),
+                reasoning_used=reasoning_used,
+                reasoning_summary=reasoning_summary,
+                usage_parts=usage_parts,
+            )
+            state["pending"] = None
+            await core.sessions.save(state)
+            if core.debug:
+                _debug_print(turn, state, msg)
+            return ok(turn)
+
+        prior_collected = (pending or {}).get("collectedInput") or {}
+        state["pending"] = {
+            "type": "clarification",
+            "action": action_name or (pending or {}).get("action") or "",
+            "collectedInput": {**prior_collected, **action_input},
+            "missingFields": missing,
+            "attemptsUsed": attempts,
+            "clarificationStrategy": strategy,
+        }
+        clar = {
+            "missingFields": missing,
+            "question": question,
+            "pendingAction": state["pending"]["action"],
+        }
+        turn = await _build_turn(
+            core,
+            state,
+            session_id,
+            msg,
+            started,
+            intent="clarification",
+            confidence=confidence,
+            natural_language_response=question,
+            clarification_needed=clar,
+            reasoning_used=reasoning_used,
+            reasoning_summary=reasoning_summary,
+            usage_parts=usage_parts,
+        )
+        if core.debug:
+            _debug_print(turn, state, msg)
+        return ok(turn)
+    return None
+
+
 async def run_turn(
     core,
     user_message: str,
@@ -848,86 +938,15 @@ async def run_turn(
             _debug_print(turn, state, msg)
         return ok(turn)
 
-    missing = res.get("missing_fields") or []
-    needs_clarify = (
-        resolution == "clarify"
-        or confidence < threshold
-        or (resolution == "action" and missing)
+    clarify_turn = await _handle_clarification(
+        core, state, session_id, msg, started,
+        res=res, resolution=resolution, action_name=action_name,
+        action_input=action_input, confidence=confidence, threshold=threshold,
+        pending=pending, reasoning_used=reasoning_used,
+        reasoning_summary=reasoning_summary, usage_parts=usage_parts,
     )
-
-    if needs_clarify and resolution != "confirm":
-        question = res.get("user_reply") or ""
-        strategy = "missing_field"
-        if not question.strip():
-            question, strategy = await generate_clarification(
-                core.llm,
-                core.identity,
-                core.behavior,
-                state,
-                msg,
-                action_name or (pending or {}).get("action") or "unknown",
-                (pending or {}).get("collectedInput") or action_input,
-                missing,
-                confidence,
-                question,
-            )
-        attempts = ((pending or {}).get("attemptsUsed") or 0) + 1
-        max_clar = core.behavior.get("maxClarifications", 2)
-        if attempts > max_clar:
-            turn = await _build_turn(
-                core,
-                state,
-                session_id,
-                msg,
-                started,
-                intent="unsupported",
-                confidence=confidence,
-                natural_language_response=(
-                    "I'm still not sure what you need. "
-                    "Could you rephrase or be more specific?"
-                ),
-                reasoning_used=reasoning_used,
-                reasoning_summary=reasoning_summary,
-                usage_parts=usage_parts,
-            )
-            state["pending"] = None
-            await core.sessions.save(state)
-            if core.debug:
-                _debug_print(turn, state, msg)
-            return ok(turn)
-
-        prior_collected = (pending or {}).get("collectedInput") or {}
-        state["pending"] = {
-            "type": "clarification",
-            "action": action_name or (pending or {}).get("action") or "",
-            "collectedInput": {**prior_collected, **action_input},
-            "missingFields": missing,
-            "attemptsUsed": attempts,
-            "clarificationStrategy": strategy,
-        }
-        clar = {
-            "missingFields": missing,
-            "question": question,
-            "pendingAction": state["pending"]["action"],
-        }
-        turn = await _build_turn(
-            core,
-            state,
-            session_id,
-            msg,
-            started,
-            intent="clarification",
-            confidence=confidence,
-            natural_language_response=question,
-            clarification_needed=clar,
-            reasoning_used=reasoning_used,
-            reasoning_summary=reasoning_summary,
-            usage_parts=usage_parts,
-        )
-        if core.debug:
-            _debug_print(turn, state, msg)
-        return ok(turn)
-
+    if clarify_turn is not None:
+        return clarify_turn
     if resolution in ("chitchat", "unsupported") or (
         resolution != "action" and resolution != "confirm"
     ):
