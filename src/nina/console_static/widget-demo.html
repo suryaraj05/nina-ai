@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NINA widget — product cards demo</title>
+<style>
+  :root{ --ink:#1a1e2e; --muted:#6b7280; --bg:#f3f1ec; --green:#0b7a3b; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',system-ui,-apple-system,sans-serif;color:var(--ink);background:#fff;}
+  .topbar{background:#0c2a1e;color:#cfe7d8;font-size:.78rem;text-align:center;padding:7px;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid #eee;}
+  .brand{font-size:1.6rem;font-weight:800;letter-spacing:-.5px}
+  .brand small{display:block;font-size:.6rem;font-weight:500;color:var(--muted);letter-spacing:2px;margin-top:-4px}
+  nav a{margin:0 12px;color:var(--ink);text-decoration:none;font-size:.9rem}
+  .hero{background:var(--bg);margin:20px 28px;border-radius:14px;padding:48px 40px;}
+  .hero h1{font-size:2.6rem;line-height:1.1;margin:0 0 10px;font-weight:800;letter-spacing:-1px}
+  .hero p{color:#444;margin:0 0 22px}
+  .hero button{background:#111;color:#fff;border:none;padding:13px 26px;border-radius:6px;font-weight:600;cursor:pointer}
+  h2{margin:30px 28px 14px;font-size:1.2rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:18px;margin:0 28px 60px}
+  .p{}
+  .p .ph{height:190px;border-radius:10px;background:linear-gradient(135deg,#dfe4ea,#cfd6df)}
+  .p .nm{font-size:.86rem;margin-top:8px}
+  .p .pr{font-size:.86rem;font-weight:700}
+  .note{margin:0 28px 30px;padding:14px 16px;background:#eef6f0;border:1px solid #cfe7d8;border-radius:10px;font-size:.85rem;color:#15603a}
+</style>
+</head>
+<body>
+  <div class="topbar">Free shipping on prepaid orders above ₹1499</div>
+  <header>
+    <div class="brand">sukoon<span style="color:#0b7a3b">.</span><small>MADE FOR INDIA</small></div>
+    <nav><a>New In</a><a>T-Shirts</a><a>Shirts</a><a>Bottoms</a><a>Sale</a></nav>
+  </header>
+
+  <section class="hero">
+    <h1>New Season.<br>New Energy.</h1>
+    <p>Light fits. Bold moves.</p>
+    <button>SHOP NOW</button>
+  </section>
+
+  <div class="note">
+    <b>Demo:</b> click the chat button (bottom-right) and try
+    “<i>is the blue one in M?</i>”, “<i>show me in dark colors</i>”, or
+    “<i>add the oversized calm blue tee</i>”. The backend is stubbed locally so
+    the widget renders <b>real product cards</b> without an LLM.
+  </div>
+
+  <h2>Bestsellers</h2>
+  <div class="grid">
+    <div class="p"><div class="ph" style="background:linear-gradient(135deg,#aebfcf,#8fa6bd)"></div><div class="nm">Oversized Calm Blue Tee</div><div class="pr">₹899</div></div>
+    <div class="p"><div class="ph" style="background:linear-gradient(135deg,#e7e2d6,#d6cdbb)"></div><div class="nm">Linen Blend Shirt</div><div class="pr">₹1,299</div></div>
+    <div class="p"><div class="ph" style="background:linear-gradient(135deg,#3a3a3a,#222)"></div><div class="nm">Relaxed Cargo Pants</div><div class="pr">₹1,199</div></div>
+    <div class="p"><div class="ph" style="background:linear-gradient(135deg,#5a4a3a,#42352a)"></div><div class="nm">Textured Comfort Tee</div><div class="pr">₹799</div></div>
+  </div>
+
+  <!-- ── Stub the NINA backend so the widget renders cards offline ── -->
+  <script>
+  (function () {
+    var BLUE = [
+      { title: "Oversized Calm Blue Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#aebfcf,#8fa6bd)" },
+      { title: "Washed Blue Relaxed Tee", price: "799", currency: "₹", swatch: "linear-gradient(135deg,#9fb2c8,#7d95ad)" },
+      { title: "Blue Graphic Back Print Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#3b4d6b,#2c3a52)" },
+      { title: "Striped Blue Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#c4d2e2,#9fb2c8)" }
+    ];
+    var DARK = [
+      { title: "Charcoal Grey Oversized Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#4b4f57,#33373d)" },
+      { title: "Jet Black Minimal Tee", price: "849", currency: "₹", swatch: "linear-gradient(135deg,#23262b,#15171a)" },
+      { title: "Navy Blue Pique Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#26324a,#1b2435)" },
+      { title: "Black Graphic Print Tee", price: "899", currency: "₹", swatch: "linear-gradient(135deg,#2c2f34,#1c1e22)" }
+    ];
+    function turn(reply, products, intent) {
+      return { ok: true, data: { intent: intent || "results", naturalLanguageResponse: reply, products: products || null, instructions: [] } };
+    }
+    function reply(msg) {
+      msg = (msg || "").toLowerCase();
+      if (/\badd\b|cart|bag/.test(msg))
+        return turn("Done — I've added it to your cart 🛒 You now have it in your bag.", null, "action");
+      if (/dark|black|charcoal|navy/.test(msg))
+        return turn("Sure! Here are some dark colour tees in size M.", DARK);
+      if (/\bm\b|size|stock|available/.test(msg))
+        return turn("Yes! The Oversized Calm Blue Tee is available in size M. Here are similar blue tees you might like:", BLUE);
+      if (/blue|tee|t-?shirt|show|recommend|suggest/.test(msg))
+        return turn("Here are some blue tees in size M you might like:", BLUE);
+      return turn("I can help you find products, check sizes, and add to cart. Try “show me blue tees”.", null, "chitchat");
+    }
+    var realFetch = window.fetch.bind(window);
+    window.fetch = function (url, opts) {
+      if (String(url).indexOf("/v1/query") !== -1) {
+        var body = {};
+        try { body = JSON.parse((opts && opts.body) || "{}"); } catch (e) {}
+        return Promise.resolve({ ok: true, json: function () { return Promise.resolve(reply(body.message)); } });
+      }
+      return realFetch(url, opts);
+    };
+  })();
+  </script>
+
+  <!-- The real NINA widget (served by the console at /sdk/) -->
+  <script src="/sdk/nina-bootstrap.js?v=cards1"
+          data-api="https://demo.local" data-api-key="pk_demo" data-site-id="sukoon-demo"
+          data-name="Sukoon AI" data-color="#0b7a3b"
+          data-greeting="Hi! I'm Sukoon AI. Ask me about sizes, colours, or what to buy." defer></script>
+</body>
+</html>

@@ -124,6 +124,28 @@
     font-size:.68rem;color:#c0c8db;background:#fff;flex-shrink:0;line-height:1.6;}\
   #nina-brand a{color:#c0c8db;text-decoration:none;}\
   #nina-brand a:hover{color:#9aa4c0;}\
+  .nina-products{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 8px;\
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}\
+  .nina-products::-webkit-scrollbar{height:5px;}\
+  .nina-products::-webkit-scrollbar-thumb{background:#d0d6e8;border-radius:3px;}\
+  .nina-card{flex:0 0 134px;scroll-snap-align:start;background:#fff;\
+    border:1px solid #eef1f9;border-radius:12px;overflow:hidden;\
+    display:flex;flex-direction:column;box-shadow:0 1px 4px rgba(0,0,0,.05);}\
+  .nina-card-img{width:100%;height:118px;object-fit:cover;display:block;\
+    background:#eef1f7;border:none;}\
+  .nina-card-body{padding:8px 9px 9px;display:flex;flex-direction:column;gap:5px;flex:1;}\
+  .nina-card-title{font-size:.78rem;line-height:1.25;color:#1a1e2e;\
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;\
+    overflow:hidden;min-height:2em;}\
+  .nina-card-price{font-size:.82rem;font-weight:700;color:#1a1e2e;}\
+  .nina-card-meta{font-size:.68rem;color:#8a93ad;}\
+  .nina-card-btn{margin-top:auto;border:none;border-radius:8px;cursor:pointer;\
+    background:' + CFG.color + ';color:#fff;font-size:.74rem;font-weight:700;\
+    padding:7px;transition:opacity .12s;}\
+  .nina-card-btn:hover{opacity:.88;}\
+  .nina-products.nina-single .nina-card{flex:1 1 auto;flex-direction:row;}\
+  .nina-products.nina-single .nina-card-img{width:96px;height:96px;flex-shrink:0;}\
+  .nina-products.nina-single .nina-card-body{justify-content:center;}\
   @media(max-width:480px){\
     #nina-panel{bottom:0 !important;left:0 !important;right:0 !important;\
       width:100% !important;max-width:100% !important;\
@@ -209,6 +231,60 @@
     msgBox().scrollTop = 99999;
   }
 
+  /* ── Product cards ── */
+  function renderProducts(products) {
+    if (!products || !products.length) return;
+    var single = products.length === 1;
+    var wrap = createEl('div', { class: 'nina-products' + (single ? ' nina-single' : '') });
+    products.forEach(function (p) {
+      var card = createEl('div', { class: 'nina-card' });
+
+      // Image: a real URL if given, else a soft colour swatch fallback.
+      var img;
+      if (p.image) {
+        img = createEl('img', { class: 'nina-card-img', alt: p.title || '', loading: 'lazy' });
+        img.src = p.image;
+      } else {
+        img = createEl('div', { class: 'nina-card-img' });
+        if (p.swatch) img.style.background = p.swatch;
+      }
+      if (p.url) {
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', function () { W.open(p.url, '_blank', 'noopener'); });
+      }
+
+      var body = createEl('div', { class: 'nina-card-body' });
+      var title = createEl('div', { class: 'nina-card-title' });
+      title.textContent = p.title || '';
+      body.appendChild(title);
+
+      if (p.meta) {
+        var meta = createEl('div', { class: 'nina-card-meta' });
+        meta.textContent = p.meta;       // e.g. "Size: M · In Stock"
+        body.appendChild(meta);
+      }
+
+      var price = createEl('div', { class: 'nina-card-price' });
+      if (p.price != null && p.price !== '') price.textContent = (p.currency || '') + p.price;
+      body.appendChild(price);
+
+      var btn = createEl('button', { class: 'nina-card-btn', type: 'button' });
+      btn.textContent = p.cta || 'Add to Cart';
+      btn.addEventListener('click', function () {
+        if (_busy) return;
+        addRow('user', 'Add ' + (p.title || 'this') + ' to cart');
+        chat('add ' + (p.title || 'this item') + ' to my cart');
+      });
+      body.appendChild(btn);
+
+      card.appendChild(img);
+      card.appendChild(body);
+      wrap.appendChild(card);
+    });
+    msgBox().appendChild(wrap);
+    msgBox().scrollTop = 99999;
+  }
+
   /* ── Instruction execution ── */
   function execInstructions(instructions) {
     (instructions || []).forEach(function (ins) {
@@ -282,6 +358,10 @@
       var turn = data.data;
       var reply = (turn.naturalLanguageResponse || '').trim();
       if (reply) addRow('bot', reply);
+
+      // Product cards: the engine may attach a `products` array (search /
+      // recommendation results) for the shopper to browse and add inline.
+      if (turn.products && turn.products.length) renderProducts(turn.products);
 
       var intent = turn.intent;
       if (intent === 'confirmation') {
