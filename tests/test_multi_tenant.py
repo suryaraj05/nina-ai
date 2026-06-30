@@ -10,6 +10,7 @@ def _reset():
     STORE.sites.clear()
     STORE.api_keys.clear()
     STORE.cli_tokens.clear()
+    STORE.conversation_logs.clear()
     POOL._instances.clear()
     POOL._locks.clear()
 

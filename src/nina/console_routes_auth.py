@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from .console_deps import POOL, STORE, _require_dashboard_token, _require_site_ownership
 from .console_schemas import KeyIssueIn, SiteLlmConfigIn
@@ -37,6 +37,21 @@ def merchant_get_usage(site_id: str, authorization: str | None = Header(default=
     usage = STORE.get_usage(site_id)
     plan = STORE.get_site(site_id).get("plan", "free")
     return {"ok": True, "data": {**(usage or {}), "plan": plan}}
+
+@router.get("/v1/auth/sites/{site_id}/conversations")
+def merchant_list_conversations(
+    site_id: str,
+    authorization: str | None = Header(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    session_id: str | None = Query(default=None, alias="sessionId"),
+) -> dict[str, Any]:
+    """Recent widget turns for merchant debugging (7-day retention)."""
+    from .conversation_log import RETENTION_DAYS
+
+    org = _require_dashboard_token(authorization)
+    _require_site_ownership(org, site_id)
+    logs = STORE.list_conversation_logs(site_id, limit=limit, session_id=session_id)
+    return {"ok": True, "data": {"logs": logs, "retentionDays": RETENTION_DAYS}}
 
 @router.get("/v1/auth/sites/{site_id}/keys")
 def merchant_list_keys(site_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:

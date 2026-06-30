@@ -48,6 +48,7 @@ class ConsoleStore:
     api_keys: dict[str, dict[str, Any]] = field(default_factory=dict)
     cli_tokens: dict[str, dict[str, Any]] = field(default_factory=dict)
     webhook_events: list[dict[str, Any]] = field(default_factory=list)
+    conversation_logs: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     usage: dict[str, dict[str, Any]] = field(default_factory=dict)
     store_path: Path | None = field(default=None, repr=False)
 
@@ -65,6 +66,7 @@ class ConsoleStore:
         self.api_keys = data.get("api_keys", {})
         self.cli_tokens = data.get("cli_tokens", {})
         self.webhook_events = data.get("webhook_events", [])
+        self.conversation_logs = data.get("conversation_logs", {})
         self.usage = data.get("usage", {})
 
     def save(self) -> None:
@@ -83,6 +85,7 @@ class ConsoleStore:
                             "api_keys": self.api_keys,
                             "cli_tokens": self.cli_tokens,
                             "webhook_events": self.webhook_events,
+                            "conversation_logs": self.conversation_logs,
                             "usage": self.usage,
                         },
                         indent=2,
@@ -380,6 +383,34 @@ class ConsoleStore:
         if event_type:
             return [e for e in self.webhook_events if e.get("type") == event_type]
         return list(self.webhook_events)
+
+    def append_conversation_log(self, site_id: str, entry: dict[str, Any]) -> None:
+        from .conversation_log import prune_entries
+
+        logs = self.conversation_logs.setdefault(site_id, [])
+        logs.append(entry)
+        self.conversation_logs[site_id] = prune_entries(logs)
+        self.save()
+
+    def list_conversation_logs(
+        self,
+        site_id: str,
+        *,
+        limit: int = 50,
+        session_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        from .conversation_log import RETENTION_SECONDS
+        from .store_util import now_ts as _now_ts
+
+        cutoff = _now_ts() - RETENTION_SECONDS
+        logs = [
+            e for e in self.conversation_logs.get(site_id, [])
+            if int(e.get("createdAt") or 0) >= cutoff
+        ]
+        if session_id:
+            logs = [e for e in logs if e.get("sessionId") == session_id]
+        logs.sort(key=lambda e: int(e.get("createdAt") or 0), reverse=True)
+        return logs[: max(1, min(limit, 200))]
 
     def count_orgs(self) -> int:
         return len(self.orgs)

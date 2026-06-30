@@ -108,6 +108,20 @@ async def multi_tenant_query(
                 session_hints=body.session_hints, confirmed=body.confirmed,
             )
         envelope = {**envelope, "data": turn}
+        try:
+            from .conversation_log import entry_from_turn
+
+            STORE.append_conversation_log(
+                site["id"],
+                entry_from_turn(
+                    site["id"],
+                    body.sessionId,
+                    body.transcript or body.message or "",
+                    turn,
+                ),
+            )
+        except Exception:
+            logger.exception("conversation log append failed site=%s", site["id"])
     _latency_ms = int((time.time() - _t0) * 1000)
     _err_code = (envelope.get("error") or {}).get("code", "")
     METRICS.record(ok=bool(envelope.get("ok")), latency_ms=_latency_ms, error_code=_err_code)

@@ -563,7 +563,91 @@ class PgStore:
                     cur.execute("SELECT event_type, payload, received_at FROM nina_webhook_events ORDER BY id")
                 rows = cur.fetchall()
         return [
-            {"type": r["event_type"], "payload": _jl(r["payload"]), "receivedAt": r["received_at"]}
+            {
+                "type": r["event_type"],
+                "payload": _jl(r["payload"]) or {},
+                "receivedAt": int(r["received_at"]) if str(r["received_at"]).isdigit() else r["received_at"],
+            }
+            for r in rows
+        ]
+
+    # ── conversation logs ─────────────────────────────────────────────────────
+
+    def append_conversation_log(self, site_id: str, entry: dict[str, Any]) -> None:
+        from .conversation_log import RETENTION_SECONDS
+        from .store_util import now_ts as _now_ts
+
+        created = int(entry.get("createdAt") or _now_ts())
+        with self._conn() as conn:
+            with self._cur(conn) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO nina_conversation_logs (
+                        id, site_id, session_id, turn_id, user_message, reply,
+                        action_called, product_count, grounded, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO NOTHING
+                    """,
+                    (
+                        entry.get("id") or entry.get("turnId") or f"log_{created}",
+                        site_id,
+                        entry.get("sessionId") or "",
+                        entry.get("turnId"),
+                        entry.get("userMessage") or "",
+                        entry.get("reply") or "",
+                        entry.get("actionCalled"),
+                        int(entry.get("productCount") or 0),
+                        bool(entry.get("grounded")),
+                        str(created),
+                    ),
+                )
+                cutoff = str(_now_ts() - RETENTION_SECONDS)
+                cur.execute(
+                    "DELETE FROM nina_conversation_logs WHERE site_id = %s AND created_at < %s",
+                    (site_id, cutoff),
+                )
+
+    def list_conversation_logs(
+        self,
+        site_id: str,
+        *,
+        limit: int = 50,
+        session_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        from .conversation_log import RETENTION_SECONDS
+        from .store_util import now_ts as _now_ts
+
+        cap = max(1, min(limit, 200))
+        cutoff = str(_now_ts() - RETENTION_SECONDS)
+        sql = """
+            SELECT id, site_id, session_id, turn_id, user_message, reply,
+                   action_called, product_count, grounded, created_at
+            FROM nina_conversation_logs
+            WHERE site_id = %s AND created_at >= %s
+        """
+        params: list[Any] = [site_id, cutoff]
+        if session_id:
+            sql += " AND session_id = %s"
+            params.append(session_id)
+        sql += " ORDER BY created_at DESC LIMIT %s"
+        params.append(cap)
+        with self._conn() as conn:
+            with self._cur(conn) as cur:
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "siteId": r["site_id"],
+                "sessionId": r["session_id"],
+                "turnId": r["turn_id"],
+                "userMessage": r["user_message"],
+                "reply": r["reply"],
+                "actionCalled": r["action_called"],
+                "productCount": int(r["product_count"] or 0),
+                "grounded": bool(r["grounded"]),
+                "createdAt": int(r["created_at"]) if str(r["created_at"]).isdigit() else r["created_at"],
+            }
             for r in rows
         ]
 
@@ -718,4 +802,18 @@ CREATE TABLE IF NOT EXISTS nina_usage (
     site_id TEXT PRIMARY KEY REFERENCES nina_sites(id),
     calls INTEGER NOT NULL DEFAULT 0, last_call_at TEXT, period TEXT
 );
+CREATE TABLE IF NOT EXISTS nina_conversation_logs (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES nina_sites(id),
+    session_id TEXT NOT NULL DEFAULT '',
+    turn_id TEXT,
+    user_message TEXT NOT NULL DEFAULT '',
+    reply TEXT NOT NULL DEFAULT '',
+    action_called TEXT,
+    product_count INTEGER NOT NULL DEFAULT 0,
+    grounded BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS nina_conversation_logs_site_created
+    ON nina_conversation_logs(site_id, created_at DESC);
 """

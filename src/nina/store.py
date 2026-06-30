@@ -88,6 +88,16 @@ class Store(Protocol):
     def push_webhook_event(self, event_type: str, payload: dict[str, Any]) -> int: ...
     def list_webhook_events(self, event_type: str | None = None) -> list[dict[str, Any]]: ...
 
+    # ── conversation logs (merchant dashboard, 7-day retention) ────────────
+    def append_conversation_log(self, site_id: str, entry: dict[str, Any]) -> None: ...
+    def list_conversation_logs(
+        self,
+        site_id: str,
+        *,
+        limit: int = 50,
+        session_id: str | None = None,
+    ) -> list[dict[str, Any]]: ...
+
 
 #: The set of methods the Store contract requires. Used by the drift test to
 #: assert ConsoleStore and PgStore both implement exactly this surface.
