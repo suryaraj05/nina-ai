@@ -31,3 +31,4 @@ services:
     name: nina-redis
     plan: starter          # $10/mo
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []        # internal-only — nina-console uses private network URL
