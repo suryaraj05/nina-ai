@@ -112,8 +112,9 @@ async def merchant_generate_from_url(site_id: str, body: dict[str, Any], authori
     if is_production():
         _validate_external_url(api_base_url, "Store URL")
     try:
-        contract, meta = generate_contract_from_url(site, api_base_url, runtime=runtime)
+        contract, meta, catalog = generate_contract_from_url(site, api_base_url, runtime=runtime)
         STORE.attach_contract(site_id, contract)
+        STORE.attach_product_catalog(site_id, catalog)
         POOL.evict(site_id)
         return {"ok": True, "data": {"siteId": site_id, **meta}}
     except ValueError as exc:

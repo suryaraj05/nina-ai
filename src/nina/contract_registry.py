@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from .api_template import build_request_body, resolve_api_url
+from .catalog_rail import make_catalog_search_handler
 from .net_guard import SsrfError, validate_public_url
 
 
@@ -148,6 +149,8 @@ async def register_from_contract(
             handler = extra_handlers[action_id]
         elif mode == "server_api":
             handler = make_api_handler(contract, action)
+        elif action_id in ("search", "search_products", "list_products", "browse_products"):
+            handler = make_catalog_search_handler()
         else:
             handler = _passthrough_handler
         reg_spec = {

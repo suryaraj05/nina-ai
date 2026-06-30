@@ -117,7 +117,7 @@ def test_generate_contract_falls_back_to_static(storefront_server):
         "baseUrl": storefront_server,
         "locales": ["en"],
     }
-    contract, meta = generate_contract_from_url(site, storefront_server)
+    contract, meta, catalog = generate_contract_from_url(site, storefront_server)
     assert meta["source"] == "static"
     assert meta["actionsFound"] >= 3
     assert "apis" not in contract or not contract.get("actions")[0]["execute"].get("apiRef")

@@ -176,6 +176,7 @@ class NinaPool:
         page_id: str | None = None,
         replay_queued: bool = False,
         resume_plan: bool = False,
+        product_catalog: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Get-or-create the Nina() for site_id and run one chat turn.
 
@@ -204,6 +205,7 @@ class NinaPool:
             nina._core.config = {
                 **(nina._core.config or {}),
                 "_agentContract": contract,
+                "_productCatalog": list(product_catalog or []),
                 "_sessionHints": session_hints or {},
                 "_pageId": page_id,
             }

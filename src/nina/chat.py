@@ -8,6 +8,7 @@ import uuid
 from jsonschema import Draft202012Validator
 
 from .action_input_coalesce import coalesce_action_input
+from .catalog_rail import validate_catalog_mutation
 from .errors import LLMError, StoreError, fail, now_iso, ok
 from .executor import execute_action
 from .auth_queue import pop_replay_if_ready, save_queued_intent
@@ -364,11 +365,37 @@ async def _execute_action_turn(
         except Exception:
             pass
 
+    catalog_rows = (core.config or {}).get("_productCatalog") or []
+    ok_mut, mut_reason = validate_catalog_mutation(action_name, action_input, catalog_rows)
+    if not ok_mut:
+        turn = await _build_turn(
+            core,
+            state,
+            session_id,
+            user_message,
+            started,
+            intent="clarification",
+            confidence=confidence,
+            natural_language_response=(
+                "I can't find that in the verified catalog."
+                if "catalog" in mut_reason
+                else mut_reason.replace("_", " ").capitalize() + "."
+            ),
+            reasoning_used=reasoning_used,
+            reasoning_summary=reasoning_summary,
+            usage_parts=usage_parts,
+        )
+        if core.debug:
+            _debug_print(turn, state, user_message)
+        return ok(turn)
+
     context = {
         "sessionId": session_id,
         "userMessage": user_message,
         "locale": core.behavior.get("language", "auto"),
         "sessionData": state.get("data") or {},
+        "productCatalog": catalog_rows,
+        "agentContract": (core.config or {}).get("_agentContract") or {},
     }
     result, action_error = await execute_action(action_def, action_input, context)
 

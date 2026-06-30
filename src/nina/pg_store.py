@@ -84,6 +84,8 @@ def _site_row(row: dict[str, Any]) -> dict[str, Any]:
     }
     if row.get("agent_contract"):
         site["agentContract"] = _jl(row["agent_contract"])
+    if row.get("product_catalog"):
+        site["productCatalog"] = _jl(row["product_catalog"]) or []
     if row.get("llm_config"):
         site["llmConfig"] = _jl(row["llm_config"])
     if row.get("wa_number_id"):
@@ -329,6 +331,16 @@ class PgStore:
                 cur.execute(
                     "UPDATE nina_sites SET agent_contract = %s WHERE id = %s",
                     (_jd(contract), site_id),
+                )
+
+    def attach_product_catalog(self, site_id: str, catalog: list[dict[str, Any]]) -> None:
+        if not self.get_site(site_id):
+            raise ValueError("Unknown site_id")
+        with self._conn() as conn:
+            with self._cur(conn) as cur:
+                cur.execute(
+                    "UPDATE nina_sites SET product_catalog = %s WHERE id = %s",
+                    (_jd(list(catalog or [])), site_id),
                 )
 
     def attach_llm_config(self, site_id: str, llm_config: dict[str, Any]) -> None:
@@ -683,8 +695,9 @@ CREATE TABLE IF NOT EXISTS nina_sites (
     currency TEXT NOT NULL DEFAULT 'INR', locales TEXT NOT NULL DEFAULT '["en"]',
     markets TEXT NOT NULL DEFAULT '[]', allowed_origins TEXT NOT NULL DEFAULT '[]',
     verification TEXT NOT NULL DEFAULT '{"sandbox":"verified","production":"pending"}',
-    agent_contract TEXT, llm_config TEXT, wa_number_id TEXT, created_at TEXT NOT NULL
+    agent_contract TEXT, product_catalog TEXT, llm_config TEXT, wa_number_id TEXT, created_at TEXT NOT NULL
 );
+ALTER TABLE nina_sites ADD COLUMN IF NOT EXISTS product_catalog TEXT;
 CREATE INDEX IF NOT EXISTS nina_sites_org_id ON nina_sites(org_id);
 CREATE TABLE IF NOT EXISTS nina_api_keys (
     id TEXT PRIMARY KEY, site_id TEXT NOT NULL REFERENCES nina_sites(id),

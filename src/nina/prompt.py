@@ -191,10 +191,12 @@ user's request: "{{user_message}}".
 Result ({{result_status}}):
 {{action_result_json}}
 
-Write a concise reply to the user in {{language}} conveying this result.
-Do not expose internal field names, stack traces, or system details. If
-the result indicates failure, apologize briefly, state what went wrong in
-plain terms, and suggest a next step. Respond with ONLY the reply text."""
+Write a concise reply from the action result only. Never claim products, prices,
+stock levels, or order details that are not present in the result JSON. If the
+result is empty or indicates no matches, say so honestly. Do not expose internal
+field names, stack traces, or system details. If the result indicates failure,
+apologize briefly, state what went wrong in plain terms, and suggest a next step.
+Respond with ONLY the reply text."""
 
 
 CHITCHAT_TEMPLATE = """You are {{agent_name}}, a helpful assistant embedded in a website.

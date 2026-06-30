@@ -238,6 +238,12 @@ class ConsoleStore:
         self.sites[site_id]["agentContract"] = contract
         self.save()
 
+    def attach_product_catalog(self, site_id: str, catalog: list[dict[str, Any]]) -> None:
+        if site_id not in self.sites:
+            raise ValueError("Unknown site_id")
+        self.sites[site_id]["productCatalog"] = list(catalog or [])
+        self.save()
+
     def attach_llm_config(self, site_id: str, llm_config: dict[str, Any]) -> None:
         if site_id not in self.sites:
             raise ValueError("Unknown site_id")

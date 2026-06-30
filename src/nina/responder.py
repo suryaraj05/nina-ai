@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 
+from .catalog_rail import grounded_reply, is_grounded_result
 from .errors import LLMError
 from .prompt import CHITCHAT_TEMPLATE, COMPOSE_TEMPLATE, render
 
@@ -18,6 +19,8 @@ def _deterministic_reply(action_name, result, action_error=None) -> str:
     if isinstance(result, dict):
         if "count" in result and "results" in result:
             n = result.get("count", len(result.get("results") or []))
+            if result.get("grounded"):
+                return grounded_reply(action_name, result)
             return f"I found {n} result{'s' if n != 1 else ''}."
         if "cart" in result:
             total = (result.get("cart") or {}).get("total")
@@ -71,6 +74,9 @@ async def compose_response(
     action_error=None,
 ) -> tuple[str, dict]:
     """Returns (natural_language_response, usage_dict)."""
+    if not action_error and is_grounded_result(result or {}):
+        return grounded_reply(action_name or "", result or {}), {}
+
     if not action_error and _is_navigation_only_result(result or {}):
         return _navigation_reply(action_name or "", result or {}), {}
 

@@ -60,8 +60,9 @@ def wizard_generate_from_url(body: WizardGenerateFromUrlIn) -> dict[str, Any]:
     if is_production():
         _validate_external_url(body.apiBaseUrl, "Store URL")
     try:
-        contract, meta = generate_contract_from_url(site, body.apiBaseUrl, runtime=body.runtime)
+        contract, meta, catalog = generate_contract_from_url(site, body.apiBaseUrl, runtime=body.runtime)
         STORE.attach_contract(body.siteId, contract)
+        STORE.attach_product_catalog(body.siteId, catalog)
         POOL.evict(body.siteId)
         return {"ok": True, "data": {"siteId": body.siteId, **meta}}
     except ValueError as exc:

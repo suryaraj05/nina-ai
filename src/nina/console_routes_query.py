@@ -97,6 +97,7 @@ async def multi_tenant_query(
         session_hints=body.session_hints,
         page_id=page_context.get("pageId"),
         replay_queued=body.replayQueued,
+        product_catalog=site.get("productCatalog") or [],
     )
     if envelope.get("ok") and envelope.get("data"):
         from .instructions import turn_to_instructions
