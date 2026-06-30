@@ -118,7 +118,18 @@ def action_available_on_page(
     available = action.get("availableOn")
     if not available:
         return True
-    if page_id and page_id in available:
+    if not page_id:
+        return True
+    if page_id in available:
+        return True
+    # Widgets often send document.title or other opaque ids. Only enforce
+    # availableOn when page_id is a known contract page id.
+    known_pages = {
+        p.get("id")
+        for p in (contract.get("pages") or [])
+        if isinstance(p, dict) and p.get("id")
+    }
+    if page_id not in known_pages:
         return True
     return False
 

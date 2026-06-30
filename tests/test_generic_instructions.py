@@ -53,3 +53,30 @@ def test_api_first_server_ui_sync_steps():
     )
     types = [i["type"] for i in inst]
     assert types == ["scroll_to"]
+
+
+def test_dom_search_emits_navigate_when_page_id_is_document_title():
+    contract = {
+        "pages": [{"id": "home", "urlPattern": "/"}],
+        "actions": [{
+            "id": "search_products",
+            "description": "Search catalog",
+            "parameters": {"query": {"type": "string", "required": True}},
+            "availableOn": ["home", "product_list"],
+            "execute": {
+                "type": "dom",
+                "steps": [{"op": "navigate", "url": "/shop?search={query}"}],
+            },
+        }],
+    }
+    inst = turn_to_instructions(
+        contract,
+        {
+            "actionCalled": "search_products",
+            "actionInput": {"query": "hoodies under 3000"},
+            "actionResult": {"ok": True, "query": "hoodies under 3000"},
+            "confidence": 0.9,
+        },
+        page_context={"pageId": "TIGHTHUG — New Collection"},
+    )
+    assert inst == [{"type": "navigate", "url": "/shop?search=hoodies under 3000", "_actionId": "search_products"}]

@@ -416,7 +416,7 @@
         sessionId: getSid(),
         confirmed: !!opts.confirmed,
         replayQueued: !!opts.replayQueued,
-        page_context: { url: W.location.href, pageId: D.title },
+        page_context: { url: W.location.href },
       }),
     })
     .then(function (r) { return r.json(); })

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from nina.contract import (
+    action_available_on_page,
     expand_execute_steps,
     load_agent,
     match_page_id,
@@ -55,6 +56,22 @@ def test_resolve_search_intent():
         page_id="catalog",
     )
     assert result["ok"] is True
+
+
+def test_action_available_on_page_allows_unknown_widget_page_id():
+    contract = {
+        "pages": [{"id": "home", "urlPattern": "/"}],
+        "actions": [{
+            "id": "search_products",
+            "availableOn": ["home", "product_list"],
+            "execute": {"type": "dom", "steps": [{"op": "navigate", "url": "/shop?search={query}"}]},
+        }],
+    }
+    action = contract["actions"][0]
+    assert action_available_on_page(contract, action, "TIGHTHUG — Shop All") is True
+    assert action_available_on_page(contract, action, None) is True
+    contract["pages"].append({"id": "product_detail", "urlPattern": "/product/"})
+    assert action_available_on_page(contract, action, "product_detail") is False
 
 
 def test_resolve_checkout_requires_confirm():

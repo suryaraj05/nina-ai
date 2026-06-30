@@ -28,7 +28,37 @@ def _deterministic_reply(action_name, result, action_error=None) -> str:
             return f"Order placed successfully. Reference: {oid}."
         if result.get("reset"):
             return "Conversation reset. How can I help?"
+        if _is_navigation_only_result(result):
+            return _navigation_reply(action_name, result)
     return "Done — let me know if you need anything else."
+
+
+def _is_navigation_only_result(result: dict) -> bool:
+    if not isinstance(result, dict):
+        return False
+    if isinstance(result.get("results"), list) or isinstance(result.get("data"), list):
+        return False
+    if result.get("cart") or result.get("orderId"):
+        return False
+    return bool(result.get("ok")) or any(
+        key in result for key in ("query", "categorySlug", "url", "productId")
+    )
+
+
+def _navigation_reply(action_name: str, result: dict) -> str:
+    if action_name in ("search", "search_products"):
+        query = str(result.get("query") or "").strip()
+        if query:
+            return f"Opening search results for {query}."
+        return "Opening search results for you."
+    if action_name == "open_category":
+        slug = str(result.get("categorySlug") or "").strip()
+        if slug:
+            return f"Taking you to {slug.replace('-', ' ')}."
+        return "Taking you to that category."
+    if action_name in ("navigate", "open_page"):
+        return "Opening that page for you."
+    return "On it — opening that for you."
 
 
 async def compose_response(
@@ -41,6 +71,9 @@ async def compose_response(
     action_error=None,
 ) -> tuple[str, dict]:
     """Returns (natural_language_response, usage_dict)."""
+    if not action_error and _is_navigation_only_result(result or {}):
+        return _navigation_reply(action_name or "", result or {}), {}
+
     status = "error" if action_error else "success"
     payload = {
         "agent_name": identity["agentName"],
