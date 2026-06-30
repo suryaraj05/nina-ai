@@ -211,7 +211,7 @@
       <input type="password" id="llmApiKey" placeholder="Paste your API key here">
 
       <label>Model</label>
-      <input type="text" id="llmModel" value="gemini-2.0-flash">
+      <input type="text" id="llmModel" value="gemini-3.1-flash-lite">
 
       <div id="llmEndpointRow">
         <label>API endpoint <span style="font-weight:400;color:var(--muted)">(auto-filled)</span></label>
@@ -515,7 +515,7 @@ function timeSince(epochSecs) {
 // ── LLM config ────────────────────────────────────────────────────────────────
 const PROVIDER_PRESETS = {
   openrouter:    { provider:'openai', model:'meta-llama/llama-3.3-70b-instruct:free', endpoint:'https://openrouter.ai/api/v1' },
-  openai_gemini: { provider:'openai', model:'gemini-2.0-flash', endpoint:'https://generativelanguage.googleapis.com/v1beta/openai' },
+  openai_gemini: { provider:'openai', model:'gemini-3.1-flash-lite', endpoint:'https://generativelanguage.googleapis.com/v1beta/openai' },
   anthropic:     { provider:'anthropic', model:'claude-haiku-4-5-20251001', endpoint:'' },
   openai:        { provider:'openai', model:'gpt-4o-mini', endpoint:'' },
 };

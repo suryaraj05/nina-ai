@@ -102,33 +102,21 @@ async def merchant_generate_from_url(site_id: str, body: dict[str, Any], authori
     runtime = body.get("runtime", "server")
     if runtime not in ("server", "browser"):
         raise HTTPException(status_code=400, detail="runtime must be 'server' or 'browser'.")
-    from urllib.parse import urlparse
+    site = STORE.get_site(site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Unknown site_id")
+    from .console_infra import _validate_external_url
+    from .contract_generate import generate_contract_from_url
+    from .crypto import is_production
 
-    from .openapi_probe import build_contract_from_openapi, fetch_openapi_spec, resolve_base_url, spec_url_for
+    if is_production():
+        _validate_external_url(api_base_url, "Store URL")
     try:
-        spec = fetch_openapi_spec(spec_url_for(api_base_url))
-        # Prefer the spec's declared server; fall back to the origin of the
-        # pasted URL when the spec gives only a relative/empty server (so
-        # the server-side handler has a real host to call).
-        base = resolve_base_url(spec)
-        if not base.startswith(("http://", "https://")):
-            parsed = urlparse(api_base_url)
-            base = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base
-        contract = build_contract_from_openapi(spec, base_url=base or None, runtime=runtime)
-        if not contract["actions"]:
-            return {"ok": False, "errors": ["No operations found in the OpenAPI document."]}
+        contract, meta = generate_contract_from_url(site, api_base_url, runtime=runtime)
         STORE.attach_contract(site_id, contract)
         POOL.evict(site_id)
-        return {
-            "ok": True,
-            "data": {
-                "siteId": site_id,
-                "actionsFound": len(contract["actions"]),
-                "baseUrl": contract["apis"]["default"]["baseUrl"],
-                "runtime": runtime,
-            },
-        }
-    except Exception as exc:
+        return {"ok": True, "data": {"siteId": site_id, **meta}}
+    except ValueError as exc:
         return {"ok": False, "errors": [str(exc)]}
 
 @router.put("/v1/auth/sites/{site_id}/settings")

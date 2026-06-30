@@ -81,7 +81,7 @@ def infer_page_type(url: str) -> str:
         (r"/(login|signin|sign-in)", "login"),
         (r"/(account|profile|my-account)", "account"),
         (r"/(product|item|p)/", "product_detail"),
-        (r"/(shop|catalog|collection|category)", "product_list"),
+        (r"/(shop|catalog|collection|category|new-arrivals)", "product_list"),
         (r"/(search)", "search"),
         (r"/(contact)", "contact"),
     ]
