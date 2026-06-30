@@ -7,6 +7,7 @@ import uuid
 
 from jsonschema import Draft202012Validator
 
+from .action_input_coalesce import coalesce_action_input
 from .errors import LLMError, StoreError, fail, now_iso, ok
 from .executor import execute_action
 from .auth_queue import pop_replay_if_ready, save_queued_intent
@@ -118,6 +119,18 @@ def _validate_input(schema: dict, data: dict) -> list[str]:
         f"{'.'.join(str(p) for p in err.path) or '<root>'}: {err.message}"
         for err in validator.iter_errors(data or {})
     ]
+
+
+def _missing_field_question(action_name: str, schema_errors: list[str]) -> str:
+    joined = " ".join(schema_errors)
+    if action_name in ("search", "search_products") and "query" in joined:
+        return "What would you like me to search for?"
+    if action_name == "open_category" and "categorySlug" in joined:
+        return "Which category would you like to browse?"
+    return (
+        f"I need a bit more detail to run {action_name.replace('_', ' ')}: "
+        + schema_errors[0]
+    )
 
 
 def _merge_usage(*parts) -> dict:
@@ -303,12 +316,15 @@ async def _execute_action_turn(
             _debug_print(turn, state, user_message)
         return ok(turn)
 
+    action_input = coalesce_action_input(
+        action_name,
+        action_input,
+        user_message,
+        action_def.get("inputSchema"),
+    )
     schema_errors = _validate_input(action_def["inputSchema"], action_input)
     if schema_errors:
-        question = (
-            f"I need a bit more detail to run {action_name.replace('_', ' ')}: "
-            + schema_errors[0]
-        )
+        question = _missing_field_question(action_name, schema_errors)
         state["pending"] = {
             "type": "clarification",
             "action": action_name,
@@ -1083,6 +1099,12 @@ async def run_turn(
 
     action_def = core.registry.get(action_name)
     if action_def:
+        action_input = coalesce_action_input(
+            action_name,
+            action_input,
+            msg,
+            action_def.get("inputSchema"),
+        )
         schema_errors = _validate_input(action_def["inputSchema"], action_input)
         if schema_errors:
             retry_prompt = build_system_prompt(
@@ -1103,7 +1125,12 @@ async def run_turn(
                 raw2, u2 = await core.llm.resolve(retry_prompt)
                 usage_parts.append(u2)
                 res = normalize_resolution(raw2)
-                action_input = res["input"] or {}
+                action_input = coalesce_action_input(
+                    action_name,
+                    res["input"] or {},
+                    msg,
+                    action_def.get("inputSchema"),
+                )
                 post_block = run_post_parse_checks(action_name, action_input, security)
                 if post_block:
                     turn = await _build_guardrail_turn(
